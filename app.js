@@ -43,6 +43,22 @@ const els = {
     togglePanel: document.getElementById('togglePanel'),
     panelHeader: document.querySelector('.panel-header'),
     ttsAudio: document.getElementById('ttsAudio'),
+    // Voice changer
+    vcToggle: document.getElementById('vcToggle'),
+    vcStatus: document.getElementById('vcStatus'),
+    vcConfig: document.getElementById('vcConfig'),
+    vcPreset: document.getElementById('vcPreset'),
+    vcManualControls: document.getElementById('vcManualControls'),
+    vcMonitor: document.getElementById('vcMonitor'),
+    vcMonitorChk: document.getElementById('vcMonitorChk'),
+    vcPitch: document.getElementById('vcPitch'),
+    vcPitchVal: document.getElementById('vcPitchVal'),
+    vcFormant: document.getElementById('vcFormant'),
+    vcFormantVal: document.getElementById('vcFormantVal'),
+    vcReverb: document.getElementById('vcReverb'),
+    vcReverbVal: document.getElementById('vcReverbVal'),
+    vcVolume: document.getElementById('vcVolume'),
+    vcVolumeVal: document.getElementById('vcVolumeVal'),
 };
 
 // ----------- State -----------
@@ -645,6 +661,307 @@ function initSparkles() {
 }
 
 // ============================================
+// VOICE CHANGER (Mic Real-time)
+// ============================================
+const VC_PRESETS = {
+    anime:  { pitch: 8,  formant: 1.4, reverb: 0,    volume: 1.0 },  // Kobo-style anime girl
+    cute:   { pitch: 11, formant: 1.6, reverb: 0,    volume: 1.0 },  // Loli super high
+    onee:   { pitch: 4,  formant: 1.2, reverb: 0.1,  volume: 1.0 },  // Mature woman
+    robot:  { pitch: 0,  formant: 0.8, reverb: 0.3,  volume: 1.0 },  // Robotic
+    demon:  { pitch: -7, formant: 0.7, reverb: 0.4,  volume: 1.1 },  // Deep demon
+    helium: { pitch: 12, formant: 1.8, reverb: 0,    volume: 1.0 },  // Helium voice
+    echo:   { pitch: 0,  formant: 1.0, reverb: 0.7,  volume: 1.0 },  // Cave echo
+};
+
+const vcState = {
+    active: false,
+    audioContext: null,
+    micStream: null,
+    micSource: null,
+    pitchShifter: null,
+    reverbNode: null,
+    gainNode: null,
+    analyser: null,
+    monitorGain: null,
+    rafId: null,
+};
+
+// Pitch shifter using SoundTouch-like approach via AudioWorklet
+// Since we can't easily load external worklets, use a simpler granular pitch shift
+class GranularPitchShifter {
+    constructor(audioContext) {
+        this.context = audioContext;
+        this.input = audioContext.createGain();
+        this.output = audioContext.createGain();
+
+        // Use ScriptProcessor for pitch shifting (simple but works)
+        this.bufferSize = 4096;
+        this.processor = audioContext.createScriptProcessor(this.bufferSize, 1, 1);
+        this.pitchRatio = 1.0; // 1.0 = no change
+
+        // Granular pitch shift state
+        this.grainSize = 1024;
+        this.overlap = 0.5;
+        this.buffer = new Float32Array(this.bufferSize * 4);
+        this.bufferIndex = 0;
+        this.readIndex = 0;
+
+        this.processor.onaudioprocess = (e) => this.process(e);
+
+        this.input.connect(this.processor);
+        this.processor.connect(this.output);
+    }
+
+    setPitch(semitones) {
+        this.pitchRatio = Math.pow(2, semitones / 12);
+    }
+
+    process(e) {
+        const inputData = e.inputBuffer.getChannelData(0);
+        const outputData = e.outputBuffer.getChannelData(0);
+
+        // Write input to circular buffer
+        for (let i = 0; i < inputData.length; i++) {
+            this.buffer[this.bufferIndex] = inputData[i];
+            this.bufferIndex = (this.bufferIndex + 1) % this.buffer.length;
+        }
+
+        // Read from buffer at modified rate (pitch shift)
+        for (let i = 0; i < outputData.length; i++) {
+            const intIdx = Math.floor(this.readIndex);
+            const frac = this.readIndex - intIdx;
+            const idx1 = intIdx % this.buffer.length;
+            const idx2 = (intIdx + 1) % this.buffer.length;
+            // Linear interpolation
+            outputData[i] = this.buffer[idx1] * (1 - frac) + this.buffer[idx2] * frac;
+            this.readIndex += this.pitchRatio;
+
+            // Wrap read index
+            if (this.readIndex >= this.buffer.length) {
+                this.readIndex -= this.buffer.length;
+            }
+        }
+
+        // Keep readIndex from drifting too far behind/ahead of bufferIndex
+        const bufferLag = (this.bufferIndex - this.readIndex + this.buffer.length) % this.buffer.length;
+        const targetLag = this.bufferSize;
+        if (Math.abs(bufferLag - targetLag) > this.bufferSize * 2) {
+            this.readIndex = (this.bufferIndex - targetLag + this.buffer.length) % this.buffer.length;
+        }
+    }
+
+    disconnect() {
+        try {
+            this.input.disconnect();
+            this.processor.disconnect();
+            this.output.disconnect();
+        } catch (e) {}
+    }
+}
+
+// Create simple impulse response for reverb
+function createReverbImpulse(audioContext, duration = 2, decay = 2) {
+    const sampleRate = audioContext.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = audioContext.createBuffer(2, length, sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+        const data = impulse.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+        }
+    }
+    return impulse;
+}
+
+async function startVoiceChanger() {
+    try {
+        setVCStatus('Mic: Requesting access...');
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+            },
+        });
+
+        if (!vcState.audioContext || vcState.audioContext.state === 'closed') {
+            vcState.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (vcState.audioContext.state === 'suspended') {
+            await vcState.audioContext.resume();
+        }
+
+        vcState.micStream = stream;
+        vcState.micSource = vcState.audioContext.createMediaStreamSource(stream);
+
+        // ===== Build the audio graph =====
+        // Input -> PitchShifter -> Reverb (mix) -> Gain -> Analyser -> Monitor (optional)
+
+        // 1. Pitch shifter
+        vcState.pitchShifter = new GranularPitchShifter(vcState.audioContext);
+
+        // 2. Reverb (convolution)
+        vcState.reverbNode = vcState.audioContext.createConvolver();
+        vcState.reverbNode.buffer = createReverbImpulse(vcState.audioContext);
+        vcState.dryGain = vcState.audioContext.createGain();
+        vcState.wetGain = vcState.audioContext.createGain();
+
+        // 3. Output gain
+        vcState.gainNode = vcState.audioContext.createGain();
+
+        // 4. Analyser (for lip sync)
+        vcState.analyser = vcState.audioContext.createAnalyser();
+        vcState.analyser.fftSize = 256;
+        vcState.analyser.smoothingTimeConstant = 0.5;
+
+        // 5. Monitor gain (for hearing yourself)
+        vcState.monitorGain = vcState.audioContext.createGain();
+        vcState.monitorGain.gain.value = els.vcMonitorChk.checked ? 1.0 : 0;
+
+        // Connect graph
+        vcState.micSource.connect(vcState.pitchShifter.input);
+        vcState.pitchShifter.output.connect(vcState.dryGain);
+        vcState.pitchShifter.output.connect(vcState.reverbNode);
+        vcState.reverbNode.connect(vcState.wetGain);
+        vcState.dryGain.connect(vcState.gainNode);
+        vcState.wetGain.connect(vcState.gainNode);
+        vcState.gainNode.connect(vcState.analyser);
+        vcState.gainNode.connect(vcState.monitorGain);
+        vcState.monitorGain.connect(vcState.audioContext.destination);
+
+        // Apply preset settings
+        applyVCSettings();
+
+        // Start mic-based lip sync
+        startMicLipSync();
+
+        vcState.active = true;
+        els.vcToggle.textContent = '⏹ Matikan Mic';
+        els.vcToggle.classList.add('active');
+        els.vcConfig.style.display = 'block';
+        els.vcMonitor.style.display = 'block';
+        if (els.vcPreset.value === 'custom') {
+            els.vcManualControls.style.display = 'block';
+        }
+        setVCStatus('🔴 Mic: Active');
+        logMessage('ai', '[Voice Changer] Mic aktif! Suara kamu sekarang berubah real-time.');
+    } catch (e) {
+        console.error('Mic access failed:', e);
+        setVCStatus('Mic: Error - ' + e.message);
+        logMessage('ai', `[ERROR Mic] ${e.message}`);
+    }
+}
+
+function stopVoiceChanger() {
+    if (vcState.micStream) {
+        vcState.micStream.getTracks().forEach(t => t.stop());
+        vcState.micStream = null;
+    }
+    if (vcState.pitchShifter) {
+        vcState.pitchShifter.disconnect();
+        vcState.pitchShifter = null;
+    }
+    try {
+        vcState.micSource?.disconnect();
+        vcState.reverbNode?.disconnect();
+        vcState.dryGain?.disconnect();
+        vcState.wetGain?.disconnect();
+        vcState.gainNode?.disconnect();
+        vcState.analyser?.disconnect();
+        vcState.monitorGain?.disconnect();
+    } catch (e) {}
+
+    stopMicLipSync();
+
+    vcState.active = false;
+    els.vcToggle.textContent = '▶ Aktifkan Mic';
+    els.vcToggle.classList.remove('active');
+    els.vcConfig.style.display = 'none';
+    els.vcMonitor.style.display = 'none';
+    els.vcManualControls.style.display = 'none';
+    setVCStatus('Mic: Off');
+    setMouthOpen(0);
+}
+
+function applyVCSettings() {
+    if (!vcState.active && !vcState.pitchShifter) {
+        // Just save settings if not active yet
+        return;
+    }
+
+    let settings;
+    if (els.vcPreset.value === 'custom') {
+        settings = {
+            pitch: parseInt(els.vcPitch.value),
+            formant: parseFloat(els.vcFormant.value),
+            reverb: parseFloat(els.vcReverb.value),
+            volume: parseFloat(els.vcVolume.value),
+        };
+    } else {
+        settings = VC_PRESETS[els.vcPreset.value] || VC_PRESETS.anime;
+        // Sync sliders to preset values
+        els.vcPitch.value = settings.pitch;
+        els.vcFormant.value = settings.formant;
+        els.vcReverb.value = settings.reverb;
+        els.vcVolume.value = settings.volume;
+        els.vcPitchVal.textContent = (settings.pitch >= 0 ? '+' : '') + settings.pitch;
+        els.vcFormantVal.textContent = settings.formant;
+        els.vcReverbVal.textContent = settings.reverb;
+        els.vcVolumeVal.textContent = settings.volume;
+    }
+
+    if (vcState.pitchShifter) {
+        // Combine pitch + formant (formant changes vocal tract resonance, approximate via extra pitch)
+        const totalPitch = settings.pitch + (Math.log2(settings.formant) * 12 * 0.3);
+        vcState.pitchShifter.setPitch(totalPitch);
+    }
+
+    if (vcState.dryGain && vcState.wetGain) {
+        vcState.dryGain.gain.value = 1 - settings.reverb;
+        vcState.wetGain.gain.value = settings.reverb * 0.6;
+    }
+
+    if (vcState.gainNode) {
+        vcState.gainNode.gain.value = settings.volume;
+    }
+}
+
+function setVCStatus(text) {
+    if (els.vcStatus) els.vcStatus.textContent = text;
+}
+
+// ============================================
+// MIC-BASED LIP SYNC (avatar mulut gerak sesuai suara mic)
+// ============================================
+function startMicLipSync() {
+    if (!vcState.analyser) return;
+    const dataArray = new Uint8Array(vcState.analyser.frequencyBinCount);
+    const tick = () => {
+        if (!vcState.active || !vcState.analyser) {
+            setMouthOpen(0);
+            return;
+        }
+        vcState.analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        // Map volume to mouth open value (0..1)
+        const mouthValue = Math.min(1, Math.max(0, (avg - 5) / 60));
+        setMouthOpen(mouthValue);
+        vcState.rafId = requestAnimationFrame(tick);
+    };
+    tick();
+}
+
+function stopMicLipSync() {
+    if (vcState.rafId) {
+        cancelAnimationFrame(vcState.rafId);
+        vcState.rafId = null;
+    }
+}
+
+// ============================================
 // EVENT LISTENERS
 // ============================================
 els.sendBtn.addEventListener('click', () => {
@@ -710,6 +1027,40 @@ document.addEventListener('keydown', (e) => {
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
     if (e.key === 'h' || e.key === 'H') els.settingsPanel.classList.toggle('collapsed');
     if (e.key === 'o' || e.key === 'O') els.obsBtn.click();
+    if (e.key === 'm' || e.key === 'M') els.vcToggle.click();
+});
+
+// Voice Changer event listeners
+els.vcToggle.addEventListener('click', () => {
+    if (vcState.active) {
+        stopVoiceChanger();
+    } else {
+        startVoiceChanger();
+    }
+});
+
+els.vcPreset.addEventListener('change', () => {
+    els.vcManualControls.style.display = els.vcPreset.value === 'custom' ? 'block' : 'none';
+    applyVCSettings();
+    saveSettings();
+});
+
+els.vcMonitorChk.addEventListener('change', () => {
+    if (vcState.monitorGain) {
+        vcState.monitorGain.gain.value = els.vcMonitorChk.checked ? 1.0 : 0;
+    }
+});
+
+[els.vcPitch, els.vcFormant, els.vcReverb, els.vcVolume].forEach(el => {
+    el.addEventListener('input', () => {
+        const valEl = document.getElementById(el.id + 'Val');
+        if (valEl) {
+            const v = el.value;
+            valEl.textContent = (el.id === 'vcPitch' && v >= 0) ? '+' + v : v;
+        }
+        if (els.vcPreset.value === 'custom') applyVCSettings();
+        saveSettings();
+    });
 });
 
 // ============================================

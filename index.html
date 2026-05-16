@@ -57,9 +57,60 @@
                 <input type="password" id="apiKey" placeholder="AIzaSy...">
             </div>
 
-            <!-- Voice Provider -->
+            <!-- ============ VOICE CHANGER (Mic Real-time) ============ -->
+            <div class="form-group voice-changer-section">
+                <label>🎤 Voice Changer (Mic Real-time)</label>
+                <div class="vc-controls">
+                    <button class="vc-toggle-btn" id="vcToggle">▶ Aktifkan Mic</button>
+                </div>
+                <div class="vc-status" id="vcStatus">Mic: Off</div>
+            </div>
+
+            <div class="form-group voice-changer-section" id="vcConfig" style="display:none;">
+                <label>Preset Karakter</label>
+                <select id="vcPreset">
+                    <option value="anime">👧 Anime Girl (Kobo-style)</option>
+                    <option value="cute">🌸 Cute Loli (super tinggi)</option>
+                    <option value="onee">💜 Onee-san (cewek dewasa)</option>
+                    <option value="robot">🤖 Robot</option>
+                    <option value="demon">😈 Demon (suara berat)</option>
+                    <option value="helium">🎈 Helium</option>
+                    <option value="echo">🌌 Echo Cave</option>
+                    <option value="custom">⚙️ Custom Manual</option>
+                </select>
+            </div>
+
+            <div class="form-group voice-changer-section" id="vcManualControls" style="display:none;">
+                <div class="form-group inline">
+                    <label>Pitch <span id="vcPitchVal">+8</span></label>
+                    <input type="range" id="vcPitch" min="-12" max="12" step="1" value="8">
+                </div>
+                <div class="form-group inline">
+                    <label>Formant <span id="vcFormantVal">1.4</span></label>
+                    <input type="range" id="vcFormant" min="0.5" max="2" step="0.05" value="1.4">
+                </div>
+                <div class="form-group inline">
+                    <label>Reverb <span id="vcReverbVal">0.0</span></label>
+                    <input type="range" id="vcReverb" min="0" max="1" step="0.05" value="0">
+                </div>
+                <div class="form-group inline">
+                    <label>Volume <span id="vcVolumeVal">1.0</span></label>
+                    <input type="range" id="vcVolume" min="0" max="2" step="0.05" value="1.0">
+                </div>
+            </div>
+
+            <div class="form-group voice-changer-section" id="vcMonitor" style="display:none;">
+                <label>
+                    <input type="checkbox" id="vcMonitorChk"> Dengar suara sendiri (monitor)
+                </label>
+                <div class="hint" style="margin-top:6px;">
+                    ⚠️ Pakai <b>headphone</b> kalau aktif monitor, kalau gak akan feedback!
+                </div>
+            </div>
+
+            <!-- AI Voice Mode (only when mic off) -->
             <div class="form-group">
-                <label>Mode Suara</label>
+                <label>Mode Suara AI (saat mic off)</label>
                 <select id="ttsMode">
                     <option value="browser">Browser TTS (gratis, default)</option>
                     <option value="elevenlabs">ElevenLabs (berbayar)</option>
