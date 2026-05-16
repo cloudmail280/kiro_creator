@@ -99,6 +99,17 @@ if ('speechSynthesis' in window) {
 // ----------- Lip Sync -----------
 const MOUTH_SHAPES = ['shape-a', 'shape-i', 'shape-u', 'shape-e', 'shape-o', 'shape-closed'];
 
+// SVG path data for each mouth shape (anime style)
+const MOUTH_PATHS = {
+    'shape-closed': 'M 192 350 Q 200 354 208 350',
+    'shape-a': 'M 188 346 Q 200 372 212 346 Q 200 358 188 346',
+    'shape-i': 'M 186 350 Q 200 358 214 350 Q 200 354 186 350',
+    'shape-u': 'M 194 348 Q 200 362 206 348 Q 200 358 194 348',
+    'shape-e': 'M 190 348 Q 200 365 210 348 Q 200 360 190 348',
+    'shape-o': 'M 190 346 Q 200 370 210 346 Q 200 362 190 346',
+    'happy':   'M 184 346 Q 200 372 216 346',
+};
+
 function getMouthShapeForChar(ch) {
     ch = ch.toLowerCase();
     if ('a'.includes(ch)) return 'shape-a';
@@ -138,6 +149,11 @@ function stopLipSync() {
 function setMouth(shape) {
     MOUTH_SHAPES.forEach(s => els.mouth.classList.remove(s));
     els.mouth.classList.add(shape);
+    // Update SVG path directly (more reliable than CSS d: property)
+    const mouthShape = els.mouth.querySelector('.mouth-shape');
+    if (mouthShape && MOUTH_PATHS[shape]) {
+        mouthShape.setAttribute('d', MOUTH_PATHS[shape]);
+    }
 }
 
 // ----------- Speak -----------
@@ -418,11 +434,14 @@ function initSparkles() {
 
 // ----------- Auto blink + look around -----------
 function startIdleBehavior() {
-    // Blink every 3-6 seconds
+    // Blink every 3-6 seconds (animate SVG eyelid ry attribute)
+    const eyelids = document.querySelectorAll('.eyelid');
     setInterval(() => {
         if (state.speaking) return;
-        els.avatar.classList.add('blink');
-        setTimeout(() => els.avatar.classList.remove('blink'), 150);
+        eyelids.forEach(lid => lid.setAttribute('ry', '28'));
+        setTimeout(() => {
+            eyelids.forEach(lid => lid.setAttribute('ry', '0'));
+        }, 130);
     }, 3000 + Math.random() * 3000);
 
     // Look around occasionally

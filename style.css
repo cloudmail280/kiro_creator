@@ -1,6 +1,6 @@
 /* ============================================
    Avatar AI - TikTok Live Companion
-   Level 1: 2D CSS Avatar with TTS lip-sync
+   Anime SVG Avatar with TTS lip-sync
    ============================================ */
 
 * {
@@ -10,19 +10,14 @@
 }
 
 :root {
-    --skin: #ffd9c0;
-    --skin-shadow: #f5b596;
-    --hair: #6a4ce8;
-    --hair-light: #8a6cff;
-    --eye: #5b3aff;
-    --mouth: #e85a8a;
-    --blush: #ff8aa8;
     --bg-1: #ffd6e8;
     --bg-2: #c5b3ff;
-    --panel-bg: rgba(20, 18, 40, 0.9);
-    --panel-border: rgba(138, 108, 255, 0.5);
-    --accent: #8a6cff;
+    --panel-bg: rgba(20, 18, 40, 0.92);
+    --panel-border: rgba(167, 139, 250, 0.5);
+    --accent: #a78bfa;
+    --accent-dark: #8b5cf6;
     --text: #f0eaff;
+    --pink: #ff7eb5;
 }
 
 body {
@@ -67,7 +62,7 @@ body.obs-mode .status {
     justify-content: space-between;
     align-items: center;
     padding: 14px 18px;
-    background: linear-gradient(90deg, var(--hair), var(--accent));
+    background: linear-gradient(90deg, var(--accent-dark), var(--accent));
     cursor: pointer;
 }
 
@@ -185,7 +180,7 @@ body.obs-mode .status {
 
 .chat-input button,
 .obs-btn {
-    background: linear-gradient(90deg, var(--hair), var(--accent));
+    background: linear-gradient(90deg, var(--accent-dark), var(--accent));
     color: white;
     border: none;
     padding: 10px 16px;
@@ -198,7 +193,7 @@ body.obs-mode .status {
 
 .chat-input button:hover,
 .obs-btn:hover {
-    box-shadow: 0 4px 12px rgba(138, 108, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(167, 139, 250, 0.5);
 }
 
 .chat-input button:active,
@@ -218,7 +213,7 @@ body.obs-mode .status {
 }
 
 .trigger-btn {
-    background: rgba(138, 108, 255, 0.2);
+    background: rgba(167, 139, 250, 0.2);
     border: 1px solid var(--panel-border);
     color: var(--text);
     padding: 10px;
@@ -309,7 +304,7 @@ body.obs-mode .status {
 /* =============== SPEECH BUBBLE =============== */
 .speech-bubble {
     position: absolute;
-    top: 8%;
+    top: 6%;
     left: 50%;
     transform: translateX(-50%) scale(0);
     background: white;
@@ -343,21 +338,33 @@ body.obs-mode .status {
     border-top: 12px solid white;
 }
 
-/* =============== AVATAR (CSS ART) =============== */
+/* =============== AVATAR (SVG ANIME) =============== */
 .avatar {
     position: relative;
-    width: 320px;
-    height: 480px;
+    width: 400px;
+    height: 600px;
     animation: idle 3s ease-in-out infinite;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+}
+
+.avatar-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 @keyframes idle {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+    50% { transform: translateY(-10px); }
 }
 
 .avatar.talking {
-    animation: idle 1.5s ease-in-out infinite;
+    animation: talkingBob 0.5s ease-in-out infinite;
+}
+
+@keyframes talkingBob {
+    0%, 100% { transform: translateY(-2px) rotate(-0.5deg); }
+    50% { transform: translateY(-6px) rotate(0.5deg); }
 }
 
 .avatar.happy {
@@ -369,283 +376,101 @@ body.obs-mode .status {
     50% { transform: translateY(-30px) scale(1.05); }
 }
 
-/* Body */
-.body {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    height: 200px;
-    background: linear-gradient(180deg, #fff 0%, #e6daff 100%);
-    border-radius: 100px 100px 30px 30px;
-    border: 3px solid #2a1f5c;
-}
-
-.body::before {
-    /* Collar */
-    content: '';
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 30px;
-    background: var(--hair);
-    border-radius: 0 0 30px 30px;
-}
-
-/* Head */
-.head {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    height: 220px;
-    background: var(--skin);
-    border-radius: 50% 50% 45% 45%;
-    border: 3px solid #2a1f5c;
-    z-index: 2;
-}
-
-/* Hair back */
+/* Hair sway animation */
 .hair-back {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 240px;
-    height: 280px;
-    background: var(--hair);
-    border-radius: 50% 50% 40% 40%;
-    border: 3px solid #2a1f5c;
-    z-index: 1;
+    animation: hairSway 4s ease-in-out infinite;
+    transform-origin: 200px 220px;
 }
 
-/* Hair front (bangs) */
-.hair-front {
-    position: absolute;
-    top: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    height: 100px;
-    background: var(--hair);
-    border-radius: 50% 50% 60% 40% / 100% 100% 30% 30%;
-    border: 3px solid #2a1f5c;
-    z-index: 3;
+@keyframes hairSway {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(1deg); }
 }
 
-.hair-front::before {
-    /* Hair shine */
-    content: '';
-    position: absolute;
-    top: 12px;
-    left: 30%;
-    width: 24px;
-    height: 14px;
-    background: var(--hair-light);
-    border-radius: 50%;
-    transform: rotate(-20deg);
-}
-
-.hair-side {
-    position: absolute;
-    top: 30px;
-    width: 30px;
-    height: 140px;
-    background: var(--hair);
-    border: 3px solid #2a1f5c;
-    z-index: 3;
-}
-
-.hair-side.left {
-    left: -10px;
-    border-radius: 50% 30% 60% 40%;
-    transform: rotate(-5deg);
-}
-
-.hair-side.right {
-    right: -10px;
-    border-radius: 30% 50% 40% 60%;
-    transform: rotate(5deg);
-}
-
-/* Ribbon */
+/* Ribbon bounce */
 .ribbon {
-    position: absolute;
-    top: -20px;
-    right: 30px;
-    width: 50px;
-    height: 30px;
-    background: var(--mouth);
-    border: 3px solid #2a1f5c;
-    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-    z-index: 4;
-    transform: rotate(20deg);
+    animation: ribbonBounce 2s ease-in-out infinite;
+    transform-origin: 255px 130px;
 }
 
-.ribbon::before, .ribbon::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    width: 20px;
-    height: 16px;
-    background: var(--mouth);
-    border: 3px solid #2a1f5c;
-    border-radius: 50%;
-    transform: translateY(-50%);
-}
-.ribbon::before { left: -16px; }
-.ribbon::after { right: -16px; }
-
-/* Face */
-.face {
-    position: absolute;
-    top: 60px;
-    left: 0;
-    width: 100%;
-    height: 140px;
+@keyframes ribbonBounce {
+    0%, 100% { transform: translate(255px, 130px) rotate(15deg); }
+    50% { transform: translate(255px, 128px) rotate(18deg); }
 }
 
-/* Eyes */
-.eye {
-    position: absolute;
-    top: 30px;
-    width: 36px;
-    height: 44px;
-    background: white;
-    border: 3px solid #2a1f5c;
-    border-radius: 50%;
-    overflow: hidden;
-}
-
-.eye.left { left: 36px; }
-.eye.right { right: 36px; }
-
+/* Eye blinking - close the eyelid */
 .eyelid {
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    width: calc(100% + 4px);
-    height: 0;
-    background: var(--skin);
-    z-index: 3;
-    transition: height 0.1s;
+    transition: ry 0.1s ease-out;
 }
 
 .avatar.blink .eyelid {
-    height: calc(100% + 4px);
+    ry: 28;
 }
 
-.eyeball {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 28px;
-    height: 32px;
-    background: var(--eye);
-    border-radius: 50%;
+/* Eye look direction */
+.eyeball, .pupil {
     transition: transform 0.3s;
 }
 
-.avatar.look-left .eyeball { transform: translate(-70%, -50%); }
-.avatar.look-right .eyeball { transform: translate(-30%, -50%); }
-.avatar.look-up .eyeball { transform: translate(-50%, -70%); }
-
-.pupil {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 12px;
-    height: 14px;
-    background: #1a0d4a;
-    border-radius: 50%;
+.avatar.look-left .eyeball,
+.avatar.look-left .pupil {
+    transform: translateX(-5px);
 }
 
-.shine {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 8px;
-    height: 8px;
-    background: white;
-    border-radius: 50%;
+.avatar.look-right .eyeball,
+.avatar.look-right .pupil {
+    transform: translateX(5px);
 }
 
-/* Blush */
-.blush {
-    position: absolute;
-    top: 70px;
-    width: 30px;
-    height: 14px;
-    background: var(--blush);
-    border-radius: 50%;
-    opacity: 0.6;
-    filter: blur(2px);
-}
-.blush.left { left: 24px; }
-.blush.right { right: 24px; }
-
-.avatar.happy .blush {
-    opacity: 1;
-    width: 36px;
+.avatar.look-up .eyeball,
+.avatar.look-up .pupil {
+    transform: translateY(-3px);
 }
 
-/* Mouth */
-.mouth {
-    position: absolute;
-    top: 96px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 14px;
-    height: 6px;
-    background: var(--mouth);
-    border: 2px solid #2a1f5c;
-    border-radius: 50%;
-    transition: all 0.08s ease-out;
+/* =============== MOUTH SHAPES (lip sync) =============== */
+.mouth-shape {
+    transition: d 0.08s ease-out;
 }
 
-/* Mouth shapes for lip sync */
-.mouth.shape-a { /* "ah" - open round */
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-}
-.mouth.shape-i { /* "ee" - wide */
-    width: 26px;
-    height: 8px;
-    border-radius: 4px;
-}
-.mouth.shape-u { /* "ooh" - small round */
-    width: 12px;
-    height: 14px;
-    border-radius: 50%;
-}
-.mouth.shape-e { /* "eh" - medium */
-    width: 20px;
-    height: 12px;
-    border-radius: 50%;
-}
-.mouth.shape-o { /* "oh" - big round */
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-}
-.mouth.shape-closed {
-    width: 14px;
-    height: 4px;
-    border-radius: 4px;
+/* Closed mouth - small smile */
+.mouth.shape-closed .mouth-shape {
+    d: path("M 192 350 Q 200 354 208 350");
 }
 
-.avatar.happy .mouth {
-    width: 28px;
-    height: 16px;
-    border-radius: 0 0 50% 50%;
-    background: var(--mouth);
+/* "ah" - wide open round */
+.mouth.shape-a .mouth-shape {
+    d: path("M 188 348 Q 200 372 212 348 Q 200 360 188 348");
+}
+
+/* "ee" - wide horizontal */
+.mouth.shape-i .mouth-shape {
+    d: path("M 186 351 L 214 351 Q 214 357 186 357 Z");
+}
+
+/* "ooh" - small round o */
+.mouth.shape-u .mouth-shape {
+    d: path("M 195 348 Q 200 360 205 348 Q 200 358 195 348");
+}
+
+/* "eh" - medium open */
+.mouth.shape-e .mouth-shape {
+    d: path("M 190 350 Q 200 365 210 350 Q 200 360 190 350");
+}
+
+/* "oh" - big round */
+.mouth.shape-o .mouth-shape {
+    d: path("M 190 346 Q 200 370 210 346 Q 200 362 190 346");
+}
+
+/* Happy mouth */
+.avatar.happy .mouth-shape {
+    d: path("M 184 348 Q 200 372 216 348");
+    stroke-width: 3;
+}
+
+/* Happy expression - blush bigger */
+.avatar.happy .mouth-shape {
+    fill: #ff5a8a;
 }
 
 /* =============== REACTIONS =============== */
@@ -657,8 +482,9 @@ body.obs-mode .status {
 
 .reaction {
     position: absolute;
-    font-size: 32px;
+    font-size: 36px;
     animation: floatUp 2s ease-out forwards;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes floatUp {
@@ -668,11 +494,11 @@ body.obs-mode .status {
     }
     20% {
         opacity: 1;
-        transform: translateY(-30px) scale(1.2);
+        transform: translateY(-30px) scale(1.3);
     }
     100% {
         opacity: 0;
-        transform: translateY(-200px) scale(0.8);
+        transform: translateY(-220px) scale(0.8);
     }
 }
 
