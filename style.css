@@ -1,6 +1,5 @@
 /* ============================================
-   Avatar AI - TikTok Live Companion
-   Anime SVG Avatar with TTS lip-sync
+   Avatar AI - Genshin Impact Style
    ============================================ */
 
 * {
@@ -10,33 +9,33 @@
 }
 
 :root {
-    --bg-1: #ffd6e8;
-    --bg-2: #c5b3ff;
-    --panel-bg: rgba(20, 18, 40, 0.92);
+    --bg-1: #1a0f2e;
+    --bg-2: #4a2c7a;
+    --bg-3: #7c3aed;
+    --panel-bg: rgba(20, 12, 40, 0.92);
     --panel-border: rgba(167, 139, 250, 0.5);
     --accent: #a78bfa;
     --accent-dark: #8b5cf6;
+    --gold: #fbbf24;
     --text: #f0eaff;
-    --pink: #ff7eb5;
 }
 
 body {
     font-family: 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    background: radial-gradient(ellipse at top, var(--bg-3) 0%, var(--bg-2) 40%, var(--bg-1) 100%);
     min-height: 100vh;
     overflow: hidden;
     color: var(--text);
 }
 
-/* OBS Mode - transparent background */
+/* OBS Mode */
 body.obs-mode {
     background: transparent;
 }
-body.obs-mode .settings-panel {
-    display: none;
-}
-body.obs-mode .status {
-    display: none;
+body.obs-mode .settings-panel,
+body.obs-mode .status,
+body.obs-mode .bg-glow {
+    display: none !important;
 }
 
 /* =============== SETTINGS PANEL =============== */
@@ -54,7 +53,7 @@ body.obs-mode .status {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .panel-header {
@@ -113,13 +112,13 @@ body.obs-mode .status {
     font-size: 12px;
     font-weight: 600;
     margin-bottom: 6px;
-    color: #b8a8ff;
+    color: #c4b5fd;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .form-group label a {
-    color: var(--accent);
+    color: var(--gold);
     text-decoration: none;
     font-weight: normal;
     text-transform: none;
@@ -144,7 +143,7 @@ body.obs-mode .status {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-    border-color: var(--accent);
+    border-color: var(--gold);
 }
 
 .form-group textarea {
@@ -193,7 +192,7 @@ body.obs-mode .status {
 
 .chat-input button:hover,
 .obs-btn:hover {
-    box-shadow: 0 4px 12px rgba(167, 139, 250, 0.5);
+    box-shadow: 0 4px 16px rgba(167, 139, 250, 0.6);
 }
 
 .chat-input button:active,
@@ -213,7 +212,7 @@ body.obs-mode .status {
 }
 
 .trigger-btn {
-    background: rgba(167, 139, 250, 0.2);
+    background: rgba(167, 139, 250, 0.15);
     border: 1px solid var(--panel-border);
     color: var(--text);
     padding: 10px;
@@ -226,10 +225,11 @@ body.obs-mode .status {
 
 .trigger-btn:hover {
     background: var(--accent);
+    transform: translateY(-2px);
 }
 
 .chat-log {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.4);
     border-radius: 8px;
     padding: 10px;
     max-height: 150px;
@@ -251,7 +251,7 @@ body.obs-mode .status {
     margin-bottom: 4px;
 }
 .chat-log .msg-ai {
-    color: #b8a8ff;
+    color: #c4b5fd;
     margin-bottom: 8px;
 }
 
@@ -269,15 +269,32 @@ body.obs-mode .status {
     position: fixed;
     bottom: 16px;
     right: 16px;
-    background: rgba(0, 0, 0, 0.5);
-    color: white;
+    background: rgba(0, 0, 0, 0.6);
+    color: var(--gold);
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 11px;
     backdrop-filter: blur(4px);
+    border: 1px solid var(--panel-border);
 }
 
-/* Sparkles background */
+/* Background magical glow circle (Genshin vibe) */
+.bg-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.3) 0%, rgba(167, 139, 250, 0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: glowPulse 4s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.1); opacity: 0.9; }
+}
+
+/* Sparkles */
 .sparkles {
     position: absolute;
     inset: 0;
@@ -287,35 +304,36 @@ body.obs-mode .status {
 
 .sparkles span {
     position: absolute;
-    width: 6px;
-    height: 6px;
-    background: white;
+    width: 4px;
+    height: 4px;
+    background: var(--gold);
     border-radius: 50%;
     opacity: 0;
     animation: sparkle 4s linear infinite;
-    box-shadow: 0 0 8px white;
+    box-shadow: 0 0 12px var(--gold);
 }
 
 @keyframes sparkle {
     0%, 100% { opacity: 0; transform: scale(0); }
-    50% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1); }
 }
 
 /* =============== SPEECH BUBBLE =============== */
 .speech-bubble {
     position: absolute;
-    top: 6%;
+    top: 4%;
     left: 50%;
     transform: translateX(-50%) scale(0);
-    background: white;
-    color: #333;
-    padding: 16px 24px;
+    background: linear-gradient(135deg, #ffffff, #f3e8ff);
+    color: #2d1a4d;
+    padding: 16px 28px;
     border-radius: 24px;
-    max-width: 70%;
+    max-width: 60%;
     font-size: 18px;
     font-weight: 500;
     line-height: 1.4;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.4);
+    border: 2px solid var(--gold);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     text-align: center;
     z-index: 10;
@@ -328,23 +346,25 @@ body.obs-mode .status {
 .speech-bubble::after {
     content: '';
     position: absolute;
-    bottom: -10px;
+    bottom: -12px;
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-top: 12px solid white;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 14px solid #f3e8ff;
 }
 
-/* =============== AVATAR (SVG ANIME) =============== */
+/* =============== AVATAR (SVG Genshin Style) =============== */
 .avatar {
     position: relative;
-    width: 400px;
-    height: 600px;
+    width: 500px;
+    height: 700px;
+    max-width: 90vw;
+    max-height: 90vh;
     animation: idle 3s ease-in-out infinite;
-    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 15px 30px rgba(124, 58, 237, 0.5));
 }
 
 .avatar-svg {
@@ -355,16 +375,16 @@ body.obs-mode .status {
 
 @keyframes idle {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    50% { transform: translateY(-12px); }
 }
 
 .avatar.talking {
-    animation: talkingBob 0.5s ease-in-out infinite;
+    animation: talkingBob 0.4s ease-in-out infinite;
 }
 
 @keyframes talkingBob {
-    0%, 100% { transform: translateY(-2px) rotate(-0.5deg); }
-    50% { transform: translateY(-6px) rotate(0.5deg); }
+    0%, 100% { transform: translateY(-3px); }
+    50% { transform: translateY(-8px); }
 }
 
 .avatar.happy {
@@ -376,101 +396,67 @@ body.obs-mode .status {
     50% { transform: translateY(-30px) scale(1.05); }
 }
 
-/* Hair sway animation */
-.hair-back {
-    animation: hairSway 4s ease-in-out infinite;
-    transform-origin: 200px 220px;
+/* Hair sway */
+.hair-back-group, .hair-front {
+    transform-origin: 250px 220px;
+    animation: hairSway 5s ease-in-out infinite;
 }
 
 @keyframes hairSway {
     0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(1deg); }
+    50% { transform: rotate(0.8deg); }
 }
 
-/* Ribbon bounce */
-.ribbon {
-    animation: ribbonBounce 2s ease-in-out infinite;
-    transform-origin: 255px 130px;
+/* Vision gem pulse */
+.vision-gem {
+    transform-origin: 250px 510px;
+    animation: gemPulse 2s ease-in-out infinite;
 }
 
-@keyframes ribbonBounce {
-    0%, 100% { transform: translate(255px, 130px) rotate(15deg); }
-    50% { transform: translate(255px, 128px) rotate(18deg); }
+@keyframes gemPulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 1; filter: drop-shadow(0 0 8px var(--gold)); }
 }
 
-/* Eye blinking - close the eyelid */
+/* Forehead gem twinkle */
+.forehead-gem {
+    transform-origin: 250px 235px;
+    animation: gemTwinkle 3s ease-in-out infinite;
+}
+
+@keyframes gemTwinkle {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Eyelid (animated via JS) */
 .eyelid {
     transition: ry 0.1s ease-out;
 }
 
-.avatar.blink .eyelid {
-    ry: 28;
-}
-
 /* Eye look direction */
 .eyeball, .pupil {
-    transition: transform 0.3s;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .avatar.look-left .eyeball,
 .avatar.look-left .pupil {
-    transform: translateX(-5px);
+    transform: translateX(-6px);
 }
 
 .avatar.look-right .eyeball,
 .avatar.look-right .pupil {
-    transform: translateX(5px);
+    transform: translateX(6px);
 }
 
 .avatar.look-up .eyeball,
 .avatar.look-up .pupil {
-    transform: translateY(-3px);
+    transform: translateY(-4px);
 }
 
-/* =============== MOUTH SHAPES (lip sync) =============== */
+/* Mouth animations are handled via JS setting `d` attribute */
 .mouth-shape {
     transition: d 0.08s ease-out;
-}
-
-/* Closed mouth - small smile */
-.mouth.shape-closed .mouth-shape {
-    d: path("M 192 350 Q 200 354 208 350");
-}
-
-/* "ah" - wide open round */
-.mouth.shape-a .mouth-shape {
-    d: path("M 188 348 Q 200 372 212 348 Q 200 360 188 348");
-}
-
-/* "ee" - wide horizontal */
-.mouth.shape-i .mouth-shape {
-    d: path("M 186 351 L 214 351 Q 214 357 186 357 Z");
-}
-
-/* "ooh" - small round o */
-.mouth.shape-u .mouth-shape {
-    d: path("M 195 348 Q 200 360 205 348 Q 200 358 195 348");
-}
-
-/* "eh" - medium open */
-.mouth.shape-e .mouth-shape {
-    d: path("M 190 350 Q 200 365 210 350 Q 200 360 190 350");
-}
-
-/* "oh" - big round */
-.mouth.shape-o .mouth-shape {
-    d: path("M 190 346 Q 200 370 210 346 Q 200 362 190 346");
-}
-
-/* Happy mouth */
-.avatar.happy .mouth-shape {
-    d: path("M 184 348 Q 200 372 216 348");
-    stroke-width: 3;
-}
-
-/* Happy expression - blush bigger */
-.avatar.happy .mouth-shape {
-    fill: #ff5a8a;
 }
 
 /* =============== REACTIONS =============== */
@@ -482,37 +468,43 @@ body.obs-mode .status {
 
 .reaction {
     position: absolute;
-    font-size: 36px;
-    animation: floatUp 2s ease-out forwards;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    font-size: 40px;
+    animation: floatUp 2.5s ease-out forwards;
+    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 @keyframes floatUp {
     0% {
         opacity: 0;
-        transform: translateY(0) scale(0.5);
+        transform: translateY(0) scale(0.3) rotate(-10deg);
     }
     20% {
         opacity: 1;
-        transform: translateY(-30px) scale(1.3);
+        transform: translateY(-40px) scale(1.4) rotate(5deg);
     }
     100% {
         opacity: 0;
-        transform: translateY(-220px) scale(0.8);
+        transform: translateY(-260px) scale(0.7) rotate(-5deg);
     }
 }
 
 /* Mobile */
-@media (max-width: 600px) {
+@media (max-width: 700px) {
     .settings-panel {
         width: calc(100vw - 32px);
         max-height: 60vh;
     }
     .avatar {
-        transform: scale(0.7);
+        width: 90vw;
+        height: auto;
     }
     .speech-bubble {
         font-size: 14px;
-        padding: 10px 16px;
+        padding: 10px 18px;
+        max-width: 80%;
+    }
+    .bg-glow {
+        width: 400px;
+        height: 400px;
     }
 }

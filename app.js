@@ -1,8 +1,5 @@
 /* ============================================
-   Avatar AI - TikTok Live Companion (Level 1)
-   - Web Speech API for TTS
-   - Lip-sync via mouth shape animation
-   - Demo AI mode (offline) + Gemini API mode
+   Avatar AI - Genshin Style + ElevenLabs TTS
    ============================================ */
 
 // ----------- DOM References -----------
@@ -20,6 +17,12 @@ const els = {
     aiMode: document.getElementById('aiMode'),
     apiKeyGroup: document.getElementById('apiKeyGroup'),
     apiKey: document.getElementById('apiKey'),
+    ttsMode: document.getElementById('ttsMode'),
+    elevenApiKey: document.getElementById('elevenApiKey'),
+    elevenVoice: document.getElementById('elevenVoice'),
+    elevenCustomId: document.getElementById('elevenCustomId'),
+    elevenModel: document.getElementById('elevenModel'),
+    elevenCustomGroup: document.getElementById('elevenCustomGroup'),
     avatarName: document.getElementById('avatarName'),
     personality: document.getElementById('personality'),
     voiceSelect: document.getElementById('voiceSelect'),
@@ -31,13 +34,13 @@ const els = {
     settingsPanel: document.getElementById('settingsPanel'),
     togglePanel: document.getElementById('togglePanel'),
     panelHeader: document.querySelector('.panel-header'),
+    ttsAudio: document.getElementById('ttsAudio'),
 };
 
 // ----------- State -----------
 const state = {
     speaking: false,
     voices: [],
-    selectedVoice: null,
 };
 
 // ----------- Settings persistence -----------
@@ -45,19 +48,29 @@ function loadSettings() {
     const saved = JSON.parse(localStorage.getItem('avatarSettings') || '{}');
     if (saved.aiMode) els.aiMode.value = saved.aiMode;
     if (saved.apiKey) els.apiKey.value = saved.apiKey;
+    if (saved.ttsMode) els.ttsMode.value = saved.ttsMode;
+    if (saved.elevenApiKey) els.elevenApiKey.value = saved.elevenApiKey;
+    if (saved.elevenVoice) els.elevenVoice.value = saved.elevenVoice;
+    if (saved.elevenCustomId) els.elevenCustomId.value = saved.elevenCustomId;
+    if (saved.elevenModel) els.elevenModel.value = saved.elevenModel;
     if (saved.avatarName) els.avatarName.value = saved.avatarName;
     if (saved.personality) els.personality.value = saved.personality;
     if (saved.pitch) els.pitch.value = saved.pitch;
     if (saved.rate) els.rate.value = saved.rate;
     els.pitchVal.textContent = els.pitch.value;
     els.rateVal.textContent = els.rate.value;
-    els.apiKeyGroup.style.display = els.aiMode.value === 'gemini' ? 'block' : 'none';
+    updateUIVisibility();
 }
 
 function saveSettings() {
     localStorage.setItem('avatarSettings', JSON.stringify({
         aiMode: els.aiMode.value,
         apiKey: els.apiKey.value,
+        ttsMode: els.ttsMode.value,
+        elevenApiKey: els.elevenApiKey.value,
+        elevenVoice: els.elevenVoice.value,
+        elevenCustomId: els.elevenCustomId.value,
+        elevenModel: els.elevenModel.value,
         avatarName: els.avatarName.value,
         personality: els.personality.value,
         pitch: els.pitch.value,
@@ -66,25 +79,39 @@ function saveSettings() {
     }));
 }
 
-// ----------- Voice Setup -----------
+function updateUIVisibility() {
+    // Show/hide Gemini API key
+    els.apiKeyGroup.style.display = els.aiMode.value === 'gemini' ? 'block' : 'none';
+
+    // Show/hide ElevenLabs config
+    const isElevenLabs = els.ttsMode.value === 'elevenlabs';
+    document.querySelectorAll('.elevenlabs-config').forEach(el => {
+        el.style.display = isElevenLabs ? 'block' : 'none';
+    });
+    document.querySelectorAll('.browser-tts-config').forEach(el => {
+        el.style.display = isElevenLabs ? 'none' : 'block';
+    });
+
+    // Custom voice ID input
+    els.elevenCustomGroup.style.display =
+        (isElevenLabs && els.elevenVoice.value === 'custom') ? 'block' : 'none';
+}
+
+// ----------- Browser Voice Setup -----------
 function loadVoices() {
     state.voices = window.speechSynthesis.getVoices();
     els.voiceSelect.innerHTML = '';
-
-    // Prefer Indonesian voices first
     const sorted = [...state.voices].sort((a, b) => {
         const aId = a.lang.toLowerCase().startsWith('id') ? -1 : 0;
         const bId = b.lang.toLowerCase().startsWith('id') ? -1 : 0;
         return aId - bId;
     });
-
-    sorted.forEach((voice, idx) => {
+    sorted.forEach(voice => {
         const opt = document.createElement('option');
         opt.value = voice.name;
         opt.textContent = `${voice.name} (${voice.lang})`;
         els.voiceSelect.appendChild(opt);
     });
-
     const saved = JSON.parse(localStorage.getItem('avatarSettings') || '{}');
     if (saved.voice && state.voices.find(v => v.name === saved.voice)) {
         els.voiceSelect.value = saved.voice;
@@ -96,37 +123,36 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 
-// ----------- Lip Sync -----------
-const MOUTH_SHAPES = ['shape-a', 'shape-i', 'shape-u', 'shape-e', 'shape-o', 'shape-closed'];
-
-// SVG path data for each mouth shape (anime style)
+// ----------- Lip Sync (SVG path animation) -----------
 const MOUTH_PATHS = {
-    'shape-closed': 'M 192 350 Q 200 354 208 350',
-    'shape-a': 'M 188 346 Q 200 372 212 346 Q 200 358 188 346',
-    'shape-i': 'M 186 350 Q 200 358 214 350 Q 200 354 186 350',
-    'shape-u': 'M 194 348 Q 200 362 206 348 Q 200 358 194 348',
-    'shape-e': 'M 190 348 Q 200 365 210 348 Q 200 360 190 348',
-    'shape-o': 'M 190 346 Q 200 370 210 346 Q 200 362 190 346',
-    'happy':   'M 184 346 Q 200 372 216 346',
+    'closed': 'M 240 380 Q 250 384 260 380',
+    'a':      'M 234 376 Q 250 408 266 376 Q 250 392 234 376',
+    'i':      'M 232 380 Q 250 388 268 380 Q 250 384 232 380',
+    'u':      'M 244 378 Q 250 394 256 378 Q 250 388 244 378',
+    'e':      'M 238 378 Q 250 398 262 378 Q 250 392 238 378',
+    'o':      'M 238 374 Q 250 402 262 374 Q 250 392 238 374',
+    'happy':  'M 230 374 Q 250 402 270 374',
 };
 
 function getMouthShapeForChar(ch) {
     ch = ch.toLowerCase();
-    if ('a'.includes(ch)) return 'shape-a';
-    if ('iey'.includes(ch)) return 'shape-i';
-    if ('u'.includes(ch)) return 'shape-u';
-    if ('o'.includes(ch)) return 'shape-o';
-    if (' .,!?'.includes(ch)) return 'shape-closed';
-    return 'shape-e';
+    if ('a'.includes(ch)) return 'a';
+    if ('iey'.includes(ch)) return 'i';
+    if ('u'.includes(ch)) return 'u';
+    if ('o'.includes(ch)) return 'o';
+    if (' .,!?'.includes(ch)) return 'closed';
+    return 'e';
 }
 
 let lipSyncTimer = null;
-function startLipSync(text) {
+function startLipSync(text, durationMs = null) {
     stopLipSync();
     const chars = text.split('');
     let i = 0;
-    // Sync speed approximated to TTS rate
-    const interval = Math.max(60, 100 / parseFloat(els.rate.value));
+    // If we know total duration (ElevenLabs audio), distribute evenly
+    const interval = durationMs
+        ? Math.max(60, durationMs / chars.length)
+        : Math.max(70, 100 / parseFloat(els.rate.value));
 
     lipSyncTimer = setInterval(() => {
         if (i >= chars.length) {
@@ -143,21 +169,18 @@ function stopLipSync() {
         clearInterval(lipSyncTimer);
         lipSyncTimer = null;
     }
-    setMouth('shape-closed');
+    setMouth('closed');
 }
 
 function setMouth(shape) {
-    MOUTH_SHAPES.forEach(s => els.mouth.classList.remove(s));
-    els.mouth.classList.add(shape);
-    // Update SVG path directly (more reliable than CSS d: property)
     const mouthShape = els.mouth.querySelector('.mouth-shape');
     if (mouthShape && MOUTH_PATHS[shape]) {
         mouthShape.setAttribute('d', MOUTH_PATHS[shape]);
     }
 }
 
-// ----------- Speak -----------
-function speak(text) {
+// ----------- Speak (Browser TTS) -----------
+function speakBrowser(text) {
     return new Promise((resolve) => {
         if (!('speechSynthesis' in window)) {
             console.warn('Speech Synthesis not supported');
@@ -167,7 +190,6 @@ function speak(text) {
         }
 
         window.speechSynthesis.cancel();
-
         const utterance = new SpeechSynthesisUtterance(text);
         const voice = state.voices.find(v => v.name === els.voiceSelect.value);
         if (voice) utterance.voice = voice;
@@ -182,25 +204,126 @@ function speak(text) {
             startLipSync(text);
             showBubble(text, 0);
         };
-
         utterance.onend = () => {
-            state.speaking = false;
-            els.avatar.classList.remove('talking');
-            stopLipSync();
-            hideBubble();
-            setStatus('Idle');
+            finishSpeaking();
             resolve();
         };
-
         utterance.onerror = () => {
-            stopLipSync();
-            els.avatar.classList.remove('talking');
-            hideBubble();
+            finishSpeaking();
             resolve();
         };
 
         window.speechSynthesis.speak(utterance);
     });
+}
+
+function finishSpeaking() {
+    state.speaking = false;
+    els.avatar.classList.remove('talking');
+    stopLipSync();
+    hideBubble();
+    setStatus('Idle');
+}
+
+// ----------- Speak (ElevenLabs) -----------
+async function speakElevenLabs(text) {
+    const apiKey = els.elevenApiKey.value.trim();
+    if (!apiKey) {
+        logMessage('ai', '[ERROR] ElevenLabs API Key kosong, fallback ke Browser TTS');
+        return speakBrowser(text);
+    }
+
+    let voiceId = els.elevenVoice.value;
+    if (voiceId === 'custom') {
+        voiceId = els.elevenCustomId.value.trim();
+        if (!voiceId) {
+            logMessage('ai', '[ERROR] Voice ID custom kosong, fallback ke Browser TTS');
+            return speakBrowser(text);
+        }
+    }
+
+    const model = els.elevenModel.value || 'eleven_multilingual_v2';
+
+    setStatus('Loading audio...');
+    showBubble(text, 0);
+
+    try {
+        const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'xi-api-key': apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'audio/mpeg',
+            },
+            body: JSON.stringify({
+                text: text,
+                model_id: model,
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75,
+                    style: 0.4,
+                    use_speaker_boost: true,
+                },
+            }),
+        });
+
+        if (!res.ok) {
+            const errBody = await res.text();
+            logMessage('ai', `[ERROR ElevenLabs ${res.status}] ${errBody.slice(0, 150)}`);
+            // Fallback to browser TTS
+            hideBubble();
+            return speakBrowser(text);
+        }
+
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        return new Promise((resolve) => {
+            els.ttsAudio.src = audioUrl;
+
+            els.ttsAudio.onloadedmetadata = () => {
+                const durationMs = els.ttsAudio.duration * 1000;
+                state.speaking = true;
+                els.avatar.classList.add('talking');
+                setStatus('Bicara (ElevenLabs)...');
+                startLipSync(text, durationMs);
+            };
+
+            els.ttsAudio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                finishSpeaking();
+                resolve();
+            };
+
+            els.ttsAudio.onerror = () => {
+                URL.revokeObjectURL(audioUrl);
+                finishSpeaking();
+                logMessage('ai', '[ERROR] Audio playback gagal, fallback ke Browser TTS');
+                speakBrowser(text).then(resolve);
+            };
+
+            els.ttsAudio.play().catch(err => {
+                console.error('Play failed:', err);
+                finishSpeaking();
+                logMessage('ai', '[ERROR] Auto-play diblokir, klik avatar dulu');
+                resolve();
+            });
+        });
+    } catch (e) {
+        console.error('ElevenLabs error:', e);
+        hideBubble();
+        logMessage('ai', `[ERROR] ${e.message}, fallback ke Browser TTS`);
+        return speakBrowser(text);
+    }
+}
+
+// Universal speak function
+async function speak(text) {
+    if (els.ttsMode.value === 'elevenlabs') {
+        return speakElevenLabs(text);
+    }
+    return speakBrowser(text);
 }
 
 // ----------- Speech Bubble -----------
@@ -218,7 +341,6 @@ function hideBubble() {
     els.bubble.classList.remove('show');
 }
 
-// ----------- Status -----------
 function setStatus(text) {
     els.status.textContent = text;
 }
@@ -251,7 +373,6 @@ const DEMO_RESPONSES = [
     'Wuaa aku senang banget hari ini bareng kalian!',
 ];
 
-// List of Gemini models to try (fallback order)
 const GEMINI_MODELS = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -261,7 +382,6 @@ const GEMINI_MODELS = [
 
 async function callGeminiAPI(userText, systemPrompt, apiKey) {
     let lastError = null;
-
     for (const model of GEMINI_MODELS) {
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -269,44 +389,27 @@ async function callGeminiAPI(userText, systemPrompt, apiKey) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{
-                        parts: [{ text: `${systemPrompt}\n\nUser: ${userText}\nAvatar:` }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.9,
-                        maxOutputTokens: 100,
-                    }
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUser: ${userText}\nAvatar:` }] }],
+                    generationConfig: { temperature: 0.9, maxOutputTokens: 100 }
                 }),
             });
-
             if (!res.ok) {
                 const errBody = await res.text();
                 lastError = `${res.status}: ${errBody.slice(0, 200)}`;
-                console.warn(`Gemini ${model} failed:`, lastError);
-                // If 400/401/403, key issue — stop trying other models
                 if (res.status === 400 || res.status === 401 || res.status === 403) {
                     throw new Error(lastError);
                 }
-                continue; // Try next model on 404 (model not found)
+                continue;
             }
-
             const data = await res.json();
             const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            if (reply) {
-                console.log(`Gemini OK with ${model}`);
-                return { ok: true, reply };
-            }
+            if (reply) return { ok: true, reply };
             lastError = 'Empty response';
         } catch (e) {
             lastError = e.message;
-            console.error(`Error with ${model}:`, e);
-            // If clear auth/key error, stop
-            if (e.message.includes('400') || e.message.includes('401') || e.message.includes('403') || e.message.includes('API_KEY')) {
-                break;
-            }
+            if (e.message.includes('400') || e.message.includes('401') || e.message.includes('403')) break;
         }
     }
-
     return { ok: false, error: lastError || 'Unknown error' };
 }
 
@@ -314,64 +417,45 @@ async function getAIResponse(userText) {
     if (els.aiMode.value === 'demo') {
         return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
     }
-
-    // Gemini API mode
     const apiKey = els.apiKey.value.trim();
     if (!apiKey) {
-        return 'Eh, aku belum punya kunci AI nih. Set dulu API Key-nya ya, atau pilih Mode Demo!';
+        return 'Eh, set Gemini API Key dulu ya, atau pilih Mode Demo!';
     }
-
     const systemPrompt = els.personality.value || `Aku ${els.avatarName.value}, AI yang ramah.`;
     const result = await callGeminiAPI(userText, systemPrompt, apiKey);
+    if (result.ok) return result.reply;
 
-    if (result.ok) {
-        return result.reply;
-    }
-
-    // Show actual error in chat log for debugging
     logMessage('ai', `[ERROR Gemini] ${result.error}`);
-
-    // Detect specific errors
     const err = (result.error || '').toLowerCase();
-    if (err.includes('api_key') || err.includes('api key not valid') || err.includes('401') || err.includes('403')) {
-        return 'API Key-nya salah atau belum aktif. Cek lagi di aistudio.google.com ya!';
+    if (err.includes('api_key') || err.includes('401') || err.includes('403')) {
+        return 'API Key salah/belum aktif. Cek lagi di aistudio.google.com!';
     }
-    if (err.includes('quota') || err.includes('429') || err.includes('rate')) {
-        return 'Quota AI-nya habis nih, tunggu sebentar ya!';
+    if (err.includes('429') || err.includes('quota')) {
+        return 'Quota AI habis, tunggu sebentar ya!';
     }
-    if (err.includes('failed to fetch') || err.includes('network')) {
-        return 'Koneksi internet error, cek WiFi/data kamu ya!';
-    }
-    if (err.includes('safety') || err.includes('blocked')) {
-        return 'Hmm pesannya kena filter aman, coba pesan lain ya!';
-    }
-
-    // Fallback: use demo response
     return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
 }
 
-// ----------- Reactions (emoji float) -----------
+// ----------- Reactions -----------
 function spawnReaction(emoji, count = 1) {
     for (let i = 0; i < count; i++) {
         setTimeout(() => {
             const el = document.createElement('div');
             el.className = 'reaction';
             el.textContent = emoji;
-            el.style.left = (40 + Math.random() * 60) + '%';
+            el.style.left = (35 + Math.random() * 70) + '%';
             el.style.top = (40 + Math.random() * 30) + '%';
             els.reactions.appendChild(el);
-            setTimeout(() => el.remove(), 2000);
+            setTimeout(() => el.remove(), 2500);
         }, i * 100);
     }
 }
 
-// ----------- Send message handler -----------
+// ----------- Send message -----------
 async function handleSendMessage(text) {
     if (!text.trim() || state.speaking) return;
-
     logMessage('user', text);
     setStatus('Berpikir...');
-
     const reply = await getAIResponse(text);
     logMessage('ai', reply);
     await speak(reply);
@@ -380,23 +464,20 @@ async function handleSendMessage(text) {
 // ----------- Quick Triggers -----------
 const TRIGGER_RESPONSES = {
     like: {
-        emoji: '❤️',
-        count: 5,
+        emoji: '❤️', count: 5,
         say: () => {
-            const phrases = ['Makasih like-nya!', 'Yeay love love!', 'Aku juga sayang kalian!', 'Makasih!'];
+            const phrases = ['Makasih like-nya!', 'Yeay love love!', 'Aku juga sayang kalian!', 'Makasih banyak!'];
             return phrases[Math.floor(Math.random() * phrases.length)];
         },
         animate: () => els.avatar.classList.add('happy'),
     },
     rose: {
-        emoji: '🌹',
-        count: 8,
+        emoji: '🌹', count: 8,
         say: () => 'Wah cantiknyaa, makasih banyak ya rose-nya!',
         animate: () => els.avatar.classList.add('happy'),
     },
     gift: {
-        emoji: '🎁',
-        count: 12,
+        emoji: '🎁', count: 12,
         say: () => 'WAAAH GIFT-NYA GEDE BANGET! MAKASIH SAYANGGG!',
         animate: () => {
             els.avatar.classList.add('happy');
@@ -404,8 +485,7 @@ const TRIGGER_RESPONSES = {
         },
     },
     follow: {
-        emoji: '➕',
-        count: 3,
+        emoji: '➕', count: 3,
         say: () => 'Makasih udah follow! Selamat datang di keluarga kita!',
         animate: () => els.avatar.classList.add('happy'),
     },
@@ -420,9 +500,9 @@ async function handleTrigger(action) {
     await speak(trigger.say());
 }
 
-// ----------- Sparkles background -----------
+// ----------- Sparkles -----------
 function initSparkles() {
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
         const s = document.createElement('span');
         s.style.left = Math.random() * 100 + '%';
         s.style.top = Math.random() * 100 + '%';
@@ -432,19 +512,18 @@ function initSparkles() {
     }
 }
 
-// ----------- Auto blink + look around -----------
+// ----------- Idle behavior -----------
 function startIdleBehavior() {
-    // Blink every 3-6 seconds (animate SVG eyelid ry attribute)
     const eyelids = document.querySelectorAll('.eyelid');
+
     setInterval(() => {
         if (state.speaking) return;
-        eyelids.forEach(lid => lid.setAttribute('ry', '28'));
+        eyelids.forEach(lid => lid.setAttribute('ry', '32'));
         setTimeout(() => {
             eyelids.forEach(lid => lid.setAttribute('ry', '0'));
         }, 130);
     }, 3000 + Math.random() * 3000);
 
-    // Look around occasionally
     setInterval(() => {
         if (state.speaking) return;
         const dirs = ['look-left', 'look-right', 'look-up', ''];
@@ -485,11 +564,22 @@ document.querySelectorAll('.trigger-btn').forEach(btn => {
 });
 
 els.aiMode.addEventListener('change', () => {
-    els.apiKeyGroup.style.display = els.aiMode.value === 'gemini' ? 'block' : 'none';
+    updateUIVisibility();
     saveSettings();
 });
 
-[els.apiKey, els.avatarName, els.personality, els.voiceSelect].forEach(el => {
+els.ttsMode.addEventListener('change', () => {
+    updateUIVisibility();
+    saveSettings();
+});
+
+els.elevenVoice.addEventListener('change', () => {
+    updateUIVisibility();
+    saveSettings();
+});
+
+[els.apiKey, els.elevenApiKey, els.elevenCustomId, els.elevenModel,
+ els.avatarName, els.personality, els.voiceSelect].forEach(el => {
     el.addEventListener('change', saveSettings);
 });
 
@@ -506,8 +596,8 @@ els.rate.addEventListener('input', () => {
 els.obsBtn.addEventListener('click', () => {
     document.body.classList.toggle('obs-mode');
     els.obsBtn.textContent = document.body.classList.contains('obs-mode')
-        ? 'Keluar Mode OBS'
-        : 'Mode OBS (Background Transparan)';
+        ? '✕ Keluar Mode OBS'
+        : '📺 Mode OBS (Transparan)';
 });
 
 els.panelHeader.addEventListener('click', (e) => {
@@ -516,26 +606,17 @@ els.panelHeader.addEventListener('click', (e) => {
     }
 });
 
-// Press 'H' to toggle panel (useful for OBS)
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'h' || e.key === 'H') {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-            els.settingsPanel.classList.toggle('collapsed');
-        }
-    }
-    // Press 'O' to toggle OBS mode
-    if (e.key === 'o' || e.key === 'O') {
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-            els.obsBtn.click();
-        }
-    }
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+    if (e.key === 'h' || e.key === 'H') els.settingsPanel.classList.toggle('collapsed');
+    if (e.key === 'o' || e.key === 'O') els.obsBtn.click();
 });
 
 // ----------- Init -----------
 loadSettings();
 initSparkles();
 startIdleBehavior();
-setMouth('shape-closed');
+setMouth('closed');
 
 // Welcome
 setTimeout(() => {
