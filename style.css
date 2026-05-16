@@ -284,6 +284,47 @@ body.obs-mode .sparkles {
     padding: 4px;
 }
 
+/* VU meter (volume bar) */
+.vc-meter {
+    margin-top: 8px;
+}
+.vc-meter-label {
+    font-size: 10px;
+    color: #c4b5fd;
+    margin-bottom: 4px;
+}
+.vc-meter-bar {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+}
+.vc-meter-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e, #fbbf24, #ef4444);
+    transition: width 0.05s linear;
+    border-radius: 3px;
+}
+
+.vc-error {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    border-radius: 8px;
+    color: #fecaca;
+    font-size: 12px;
+    line-height: 1.6;
+}
+.vc-error code {
+    background: rgba(0,0,0,0.4);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+}
+
 .voice-changer-section input[type="checkbox"] {
     width: auto;
     margin-right: 6px;

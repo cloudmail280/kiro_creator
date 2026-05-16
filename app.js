@@ -59,6 +59,8 @@ const els = {
     vcReverbVal: document.getElementById('vcReverbVal'),
     vcVolume: document.getElementById('vcVolume'),
     vcVolumeVal: document.getElementById('vcVolumeVal'),
+    vcMeterFill: document.getElementById('vcMeterFill'),
+    vcError: document.getElementById('vcError'),
 };
 
 // ----------- State -----------
@@ -773,9 +775,34 @@ function createReverbImpulse(audioContext, duration = 2, decay = 2) {
     return impulse;
 }
 
+function showVCError(msg) {
+    if (els.vcError) {
+        els.vcError.style.display = 'block';
+        els.vcError.innerHTML = msg;
+    }
+}
+
+function hideVCError() {
+    if (els.vcError) els.vcError.style.display = 'none';
+}
+
 async function startVoiceChanger() {
+    hideVCError();
     try {
-        setVCStatus('Mic: Requesting access...');
+        // Pre-flight checks
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            const protocol = window.location.protocol;
+            if (protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                showVCError(`❌ Mic butuh <b>HTTPS</b>!<br>URL sekarang: <code>${protocol}//${window.location.host}</code><br><br>Solusi:<br>• Pakai GitHub Pages (https://...github.io)<br>• Atau buka <code>https://</code> bukan <code>http://</code>`);
+                setVCStatus('Mic: Error (butuh HTTPS)');
+                return;
+            }
+            showVCError('❌ Browser tidak support getUserMedia. Pakai Chrome/Firefox/Safari versi terbaru.');
+            setVCStatus('Mic: Browser unsupported');
+            return;
+        }
+
+        setVCStatus('Mic: Meminta izin akses...');
 
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -848,12 +875,23 @@ async function startVoiceChanger() {
         logMessage('ai', '[Voice Changer] Mic aktif! Suara kamu sekarang berubah real-time.');
     } catch (e) {
         console.error('Mic access failed:', e);
-        setVCStatus('Mic: Error - ' + e.message);
-        logMessage('ai', `[ERROR Mic] ${e.message}`);
+        setVCStatus('Mic: Error');
+        let msg = e.message || 'Unknown error';
+        let hint = '';
+        if (e.name === 'NotAllowedError' || msg.includes('Permission')) {
+            hint = '<br><br>📱 <b>HP:</b> Buka Settings → Site Settings → Microphone → izinkan untuk situs ini.<br>💻 <b>PC:</b> Klik icon kunci/info di address bar → izinkan Microphone.';
+        } else if (e.name === 'NotFoundError') {
+            hint = '<br><br>❌ Tidak ada mic terdeteksi. Pastikan mic terpasang/terhubung.';
+        } else if (e.name === 'NotReadableError') {
+            hint = '<br><br>❌ Mic dipakai aplikasi lain. Tutup app lain yang pakai mic (Zoom, Discord, dll).';
+        }
+        showVCError(`❌ <b>Error: ${e.name || 'Unknown'}</b><br>${msg}${hint}`);
+        logMessage('ai', `[ERROR Mic] ${e.name}: ${msg}`);
     }
 }
 
 function stopVoiceChanger() {
+    hideVCError();
     if (vcState.micStream) {
         vcState.micStream.getTracks().forEach(t => t.stop());
         vcState.micStream = null;
@@ -940,6 +978,7 @@ function startMicLipSync() {
     const tick = () => {
         if (!vcState.active || !vcState.analyser) {
             setMouthOpen(0);
+            if (els.vcMeterFill) els.vcMeterFill.style.width = '0%';
             return;
         }
         vcState.analyser.getByteFrequencyData(dataArray);
@@ -949,6 +988,11 @@ function startMicLipSync() {
         // Map volume to mouth open value (0..1)
         const mouthValue = Math.min(1, Math.max(0, (avg - 5) / 60));
         setMouthOpen(mouthValue);
+        // Update VU meter
+        if (els.vcMeterFill) {
+            const pct = Math.min(100, (avg / 80) * 100);
+            els.vcMeterFill.style.width = pct + '%';
+        }
         vcState.rafId = requestAnimationFrame(tick);
     };
     tick();
