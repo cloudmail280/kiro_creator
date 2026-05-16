@@ -235,6 +235,65 @@ const DEMO_RESPONSES = [
     'Wuaa aku senang banget hari ini bareng kalian!',
 ];
 
+// List of Gemini models to try (fallback order)
+const GEMINI_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-pro',
+];
+
+async function callGeminiAPI(userText, systemPrompt, apiKey) {
+    let lastError = null;
+
+    for (const model of GEMINI_MODELS) {
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: `${systemPrompt}\n\nUser: ${userText}\nAvatar:` }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.9,
+                        maxOutputTokens: 100,
+                    }
+                }),
+            });
+
+            if (!res.ok) {
+                const errBody = await res.text();
+                lastError = `${res.status}: ${errBody.slice(0, 200)}`;
+                console.warn(`Gemini ${model} failed:`, lastError);
+                // If 400/401/403, key issue — stop trying other models
+                if (res.status === 400 || res.status === 401 || res.status === 403) {
+                    throw new Error(lastError);
+                }
+                continue; // Try next model on 404 (model not found)
+            }
+
+            const data = await res.json();
+            const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (reply) {
+                console.log(`Gemini OK with ${model}`);
+                return { ok: true, reply };
+            }
+            lastError = 'Empty response';
+        } catch (e) {
+            lastError = e.message;
+            console.error(`Error with ${model}:`, e);
+            // If clear auth/key error, stop
+            if (e.message.includes('400') || e.message.includes('401') || e.message.includes('403') || e.message.includes('API_KEY')) {
+                break;
+            }
+        }
+    }
+
+    return { ok: false, error: lastError || 'Unknown error' };
+}
+
 async function getAIResponse(userText) {
     if (els.aiMode.value === 'demo') {
         return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
@@ -243,40 +302,36 @@ async function getAIResponse(userText) {
     // Gemini API mode
     const apiKey = els.apiKey.value.trim();
     if (!apiKey) {
-        return 'Eh, aku belum punya kunci AI nih. Set dulu API Key-nya ya!';
+        return 'Eh, aku belum punya kunci AI nih. Set dulu API Key-nya ya, atau pilih Mode Demo!';
     }
 
-    try {
-        const systemPrompt = els.personality.value || `Aku ${els.avatarName.value}, AI yang ramah.`;
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    const systemPrompt = els.personality.value || `Aku ${els.avatarName.value}, AI yang ramah.`;
+    const result = await callGeminiAPI(userText, systemPrompt, apiKey);
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: `${systemPrompt}\n\nUser: ${userText}\nAvatar:` }]
-                }],
-                generationConfig: {
-                    temperature: 0.9,
-                    maxOutputTokens: 100,
-                }
-            }),
-        });
-
-        if (!res.ok) {
-            const err = await res.text();
-            console.error('Gemini error:', err);
-            return 'Maaf, aku lagi bingung nih. Coba lagi ya!';
-        }
-
-        const data = await res.json();
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        return reply || 'Eh aku gak ngerti hehe~';
-    } catch (e) {
-        console.error(e);
-        return 'Aduh koneksi-ku error nih, coba lagi yuk!';
+    if (result.ok) {
+        return result.reply;
     }
+
+    // Show actual error in chat log for debugging
+    logMessage('ai', `[ERROR Gemini] ${result.error}`);
+
+    // Detect specific errors
+    const err = (result.error || '').toLowerCase();
+    if (err.includes('api_key') || err.includes('api key not valid') || err.includes('401') || err.includes('403')) {
+        return 'API Key-nya salah atau belum aktif. Cek lagi di aistudio.google.com ya!';
+    }
+    if (err.includes('quota') || err.includes('429') || err.includes('rate')) {
+        return 'Quota AI-nya habis nih, tunggu sebentar ya!';
+    }
+    if (err.includes('failed to fetch') || err.includes('network')) {
+        return 'Koneksi internet error, cek WiFi/data kamu ya!';
+    }
+    if (err.includes('safety') || err.includes('blocked')) {
+        return 'Hmm pesannya kena filter aman, coba pesan lain ya!';
+    }
+
+    // Fallback: use demo response
+    return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
 }
 
 // ----------- Reactions (emoji float) -----------
