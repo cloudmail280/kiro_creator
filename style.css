@@ -1,0 +1,692 @@
+/* ============================================
+   Avatar AI - TikTok Live Companion
+   Level 1: 2D CSS Avatar with TTS lip-sync
+   ============================================ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --skin: #ffd9c0;
+    --skin-shadow: #f5b596;
+    --hair: #6a4ce8;
+    --hair-light: #8a6cff;
+    --eye: #5b3aff;
+    --mouth: #e85a8a;
+    --blush: #ff8aa8;
+    --bg-1: #ffd6e8;
+    --bg-2: #c5b3ff;
+    --panel-bg: rgba(20, 18, 40, 0.9);
+    --panel-border: rgba(138, 108, 255, 0.5);
+    --accent: #8a6cff;
+    --text: #f0eaff;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    min-height: 100vh;
+    overflow: hidden;
+    color: var(--text);
+}
+
+/* OBS Mode - transparent background */
+body.obs-mode {
+    background: transparent;
+}
+body.obs-mode .settings-panel {
+    display: none;
+}
+body.obs-mode .status {
+    display: none;
+}
+
+/* =============== SETTINGS PANEL =============== */
+.settings-panel {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    width: 360px;
+    max-height: calc(100vh - 32px);
+    background: var(--panel-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: linear-gradient(90deg, var(--hair), var(--accent));
+    cursor: pointer;
+}
+
+.panel-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.toggle-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+
+.settings-panel.collapsed .panel-body {
+    display: none;
+}
+.settings-panel.collapsed .toggle-btn {
+    transform: rotate(180deg);
+}
+
+.panel-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.panel-body::-webkit-scrollbar {
+    width: 6px;
+}
+.panel-body::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 3px;
+}
+
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #b8a8ff;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group label a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: normal;
+    text-transform: none;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: var(--accent);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 50px;
+}
+
+.form-group.inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.form-group.inline label {
+    flex-shrink: 0;
+    margin: 0;
+    width: 80px;
+}
+
+.form-group.inline input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+}
+
+.chat-input input {
+    flex: 1;
+}
+
+.chat-input button,
+.obs-btn {
+    background: linear-gradient(90deg, var(--hair), var(--accent));
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.chat-input button:hover,
+.obs-btn:hover {
+    box-shadow: 0 4px 12px rgba(138, 108, 255, 0.4);
+}
+
+.chat-input button:active,
+.obs-btn:active {
+    transform: scale(0.96);
+}
+
+.obs-btn {
+    width: 100%;
+    padding: 12px;
+}
+
+.trigger-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.trigger-btn {
+    background: rgba(138, 108, 255, 0.2);
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.trigger-btn:hover {
+    background: var(--accent);
+}
+
+.chat-log {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.chat-log::-webkit-scrollbar {
+    width: 4px;
+}
+.chat-log::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+.chat-log .msg-user {
+    color: #ffd6e8;
+    margin-bottom: 4px;
+}
+.chat-log .msg-ai {
+    color: #b8a8ff;
+    margin-bottom: 8px;
+}
+
+/* =============== AVATAR STAGE =============== */
+.avatar-stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.status {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    backdrop-filter: blur(4px);
+}
+
+/* Sparkles background */
+.sparkles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.sparkles span {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+    animation: sparkle 4s linear infinite;
+    box-shadow: 0 0 8px white;
+}
+
+@keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0); }
+    50% { opacity: 0.8; transform: scale(1); }
+}
+
+/* =============== SPEECH BUBBLE =============== */
+.speech-bubble {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    background: white;
+    color: #333;
+    padding: 16px 24px;
+    border-radius: 24px;
+    max-width: 70%;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.4;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+    z-index: 10;
+}
+
+.speech-bubble.show {
+    transform: translateX(-50%) scale(1);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 12px solid white;
+}
+
+/* =============== AVATAR (CSS ART) =============== */
+.avatar {
+    position: relative;
+    width: 320px;
+    height: 480px;
+    animation: idle 3s ease-in-out infinite;
+}
+
+@keyframes idle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.avatar.talking {
+    animation: idle 1.5s ease-in-out infinite;
+}
+
+.avatar.happy {
+    animation: bounce 0.5s ease-in-out 3;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-30px) scale(1.05); }
+}
+
+/* Body */
+.body {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(180deg, #fff 0%, #e6daff 100%);
+    border-radius: 100px 100px 30px 30px;
+    border: 3px solid #2a1f5c;
+}
+
+.body::before {
+    /* Collar */
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 30px;
+    background: var(--hair);
+    border-radius: 0 0 30px 30px;
+}
+
+/* Head */
+.head {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 220px;
+    background: var(--skin);
+    border-radius: 50% 50% 45% 45%;
+    border: 3px solid #2a1f5c;
+    z-index: 2;
+}
+
+/* Hair back */
+.hair-back {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 240px;
+    height: 280px;
+    background: var(--hair);
+    border-radius: 50% 50% 40% 40%;
+    border: 3px solid #2a1f5c;
+    z-index: 1;
+}
+
+/* Hair front (bangs) */
+.hair-front {
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 100px;
+    background: var(--hair);
+    border-radius: 50% 50% 60% 40% / 100% 100% 30% 30%;
+    border: 3px solid #2a1f5c;
+    z-index: 3;
+}
+
+.hair-front::before {
+    /* Hair shine */
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 30%;
+    width: 24px;
+    height: 14px;
+    background: var(--hair-light);
+    border-radius: 50%;
+    transform: rotate(-20deg);
+}
+
+.hair-side {
+    position: absolute;
+    top: 30px;
+    width: 30px;
+    height: 140px;
+    background: var(--hair);
+    border: 3px solid #2a1f5c;
+    z-index: 3;
+}
+
+.hair-side.left {
+    left: -10px;
+    border-radius: 50% 30% 60% 40%;
+    transform: rotate(-5deg);
+}
+
+.hair-side.right {
+    right: -10px;
+    border-radius: 30% 50% 40% 60%;
+    transform: rotate(5deg);
+}
+
+/* Ribbon */
+.ribbon {
+    position: absolute;
+    top: -20px;
+    right: 30px;
+    width: 50px;
+    height: 30px;
+    background: var(--mouth);
+    border: 3px solid #2a1f5c;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    z-index: 4;
+    transform: rotate(20deg);
+}
+
+.ribbon::before, .ribbon::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 20px;
+    height: 16px;
+    background: var(--mouth);
+    border: 3px solid #2a1f5c;
+    border-radius: 50%;
+    transform: translateY(-50%);
+}
+.ribbon::before { left: -16px; }
+.ribbon::after { right: -16px; }
+
+/* Face */
+.face {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    height: 140px;
+}
+
+/* Eyes */
+.eye {
+    position: absolute;
+    top: 30px;
+    width: 36px;
+    height: 44px;
+    background: white;
+    border: 3px solid #2a1f5c;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.eye.left { left: 36px; }
+.eye.right { right: 36px; }
+
+.eyelid {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    width: calc(100% + 4px);
+    height: 0;
+    background: var(--skin);
+    z-index: 3;
+    transition: height 0.1s;
+}
+
+.avatar.blink .eyelid {
+    height: calc(100% + 4px);
+}
+
+.eyeball {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 32px;
+    background: var(--eye);
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+.avatar.look-left .eyeball { transform: translate(-70%, -50%); }
+.avatar.look-right .eyeball { transform: translate(-30%, -50%); }
+.avatar.look-up .eyeball { transform: translate(-50%, -70%); }
+
+.pupil {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 14px;
+    background: #1a0d4a;
+    border-radius: 50%;
+}
+
+.shine {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+}
+
+/* Blush */
+.blush {
+    position: absolute;
+    top: 70px;
+    width: 30px;
+    height: 14px;
+    background: var(--blush);
+    border-radius: 50%;
+    opacity: 0.6;
+    filter: blur(2px);
+}
+.blush.left { left: 24px; }
+.blush.right { right: 24px; }
+
+.avatar.happy .blush {
+    opacity: 1;
+    width: 36px;
+}
+
+/* Mouth */
+.mouth {
+    position: absolute;
+    top: 96px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 6px;
+    background: var(--mouth);
+    border: 2px solid #2a1f5c;
+    border-radius: 50%;
+    transition: all 0.08s ease-out;
+}
+
+/* Mouth shapes for lip sync */
+.mouth.shape-a { /* "ah" - open round */
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+}
+.mouth.shape-i { /* "ee" - wide */
+    width: 26px;
+    height: 8px;
+    border-radius: 4px;
+}
+.mouth.shape-u { /* "ooh" - small round */
+    width: 12px;
+    height: 14px;
+    border-radius: 50%;
+}
+.mouth.shape-e { /* "eh" - medium */
+    width: 20px;
+    height: 12px;
+    border-radius: 50%;
+}
+.mouth.shape-o { /* "oh" - big round */
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+}
+.mouth.shape-closed {
+    width: 14px;
+    height: 4px;
+    border-radius: 4px;
+}
+
+.avatar.happy .mouth {
+    width: 28px;
+    height: 16px;
+    border-radius: 0 0 50% 50%;
+    background: var(--mouth);
+}
+
+/* =============== REACTIONS =============== */
+.reactions {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.reaction {
+    position: absolute;
+    font-size: 32px;
+    animation: floatUp 2s ease-out forwards;
+}
+
+@keyframes floatUp {
+    0% {
+        opacity: 0;
+        transform: translateY(0) scale(0.5);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(-30px) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-200px) scale(0.8);
+    }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+    .settings-panel {
+        width: calc(100vw - 32px);
+        max-height: 60vh;
+    }
+    .avatar {
+        transform: scale(0.7);
+    }
+    .speech-bubble {
+        font-size: 14px;
+        padding: 10px 16px;
+    }
+}

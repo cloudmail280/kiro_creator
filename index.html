@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar AI - TikTok Live Companion</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Settings Panel (hide in OBS mode) -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="panel-header">
+            <h1>Avatar AI</h1>
+            <button class="toggle-btn" id="togglePanel" title="Sembunyikan panel">▼</button>
+        </div>
+
+        <div class="panel-body">
+            <!-- AI Provider -->
+            <div class="form-group">
+                <label>Mode AI</label>
+                <select id="aiMode">
+                    <option value="demo">Demo (offline, jawaban random)</option>
+                    <option value="gemini">Gemini API (perlu key)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="apiKeyGroup" style="display:none;">
+                <label>Gemini API Key <a href="https://aistudio.google.com/app/apikey" target="_blank">(dapatkan gratis)</a></label>
+                <input type="password" id="apiKey" placeholder="AIzaSy...">
+            </div>
+
+            <!-- Avatar Personality -->
+            <div class="form-group">
+                <label>Nama Avatar</label>
+                <input type="text" id="avatarName" value="Mira" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label>Personality</label>
+                <textarea id="personality" rows="2">Aku Mira, AI yang ceria dan ramah. Selalu jawab singkat (max 2 kalimat) dengan bahasa Indonesia santai.</textarea>
+            </div>
+
+            <!-- Voice -->
+            <div class="form-group">
+                <label>Suara</label>
+                <select id="voiceSelect"></select>
+            </div>
+
+            <div class="form-group inline">
+                <label>Pitch <span id="pitchVal">1.2</span></label>
+                <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1.2">
+            </div>
+
+            <div class="form-group inline">
+                <label>Speed <span id="rateVal">1.0</span></label>
+                <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1.0">
+            </div>
+
+            <!-- Chat input -->
+            <div class="form-group">
+                <label>Pesan ke Avatar</label>
+                <div class="chat-input">
+                    <input type="text" id="userMsg" placeholder="Ketik comment penonton di sini..." />
+                    <button id="sendBtn">Kirim</button>
+                </div>
+            </div>
+
+            <!-- Quick triggers -->
+            <div class="form-group">
+                <label>Quick Trigger</label>
+                <div class="trigger-grid">
+                    <button class="trigger-btn" data-action="like">Like</button>
+                    <button class="trigger-btn" data-action="rose">Rose</button>
+                    <button class="trigger-btn" data-action="gift">Big Gift</button>
+                    <button class="trigger-btn" data-action="follow">Follow</button>
+                </div>
+            </div>
+
+            <!-- OBS mode -->
+            <div class="form-group">
+                <button class="obs-btn" id="obsMode">Mode OBS (Background Transparan)</button>
+            </div>
+
+            <!-- Conversation log -->
+            <div class="form-group">
+                <label>Log Percakapan</label>
+                <div class="chat-log" id="chatLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avatar Stage -->
+    <div class="avatar-stage" id="avatarStage">
+        <!-- Background sparkles -->
+        <div class="sparkles" id="sparkles"></div>
+
+        <!-- Speech Bubble -->
+        <div class="speech-bubble" id="speechBubble">
+            <span id="bubbleText"></span>
+        </div>
+
+        <!-- Avatar body (CSS art) -->
+        <div class="avatar" id="avatar">
+            <!-- Hair back -->
+            <div class="hair-back"></div>
+
+            <!-- Body -->
+            <div class="body"></div>
+
+            <!-- Head -->
+            <div class="head">
+                <!-- Hair front -->
+                <div class="hair-front"></div>
+                <div class="hair-side left"></div>
+                <div class="hair-side right"></div>
+
+                <!-- Face -->
+                <div class="face">
+                    <!-- Eyes -->
+                    <div class="eye left">
+                        <div class="eyelid"></div>
+                        <div class="eyeball">
+                            <div class="pupil"></div>
+                            <div class="shine"></div>
+                        </div>
+                    </div>
+                    <div class="eye right">
+                        <div class="eyelid"></div>
+                        <div class="eyeball">
+                            <div class="pupil"></div>
+                            <div class="shine"></div>
+                        </div>
+                    </div>
+
+                    <!-- Blush -->
+                    <div class="blush left"></div>
+                    <div class="blush right"></div>
+
+                    <!-- Mouth -->
+                    <div class="mouth" id="mouth"></div>
+                </div>
+
+                <!-- Hair top accessory -->
+                <div class="ribbon"></div>
+            </div>
+
+            <!-- Reaction emoji floats -->
+            <div class="reactions" id="reactions"></div>
+        </div>
+
+        <!-- Status -->
+        <div class="status" id="status">Idle</div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
