@@ -3,18 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar AI - Genshin Style</title>
+    <title>VTuber Avatar AI - Live2D</title>
     <link rel="stylesheet" href="style.css">
+
+    <!-- Live2D Cubism Core (required) -->
+    <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+    <!-- Cubism 2 support (for older models) -->
+    <script src="https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js"></script>
+    <!-- PIXI.js (renderer) -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
+    <!-- pixi-live2d-display (loads Live2D models) -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/index.min.js"></script>
 </head>
 <body>
     <!-- Settings Panel -->
     <div class="settings-panel" id="settingsPanel">
         <div class="panel-header">
-            <h1>✨ Avatar AI</h1>
-            <button class="toggle-btn" id="togglePanel" title="Sembunyikan panel">▼</button>
+            <h1>✨ VTuber AI</h1>
+            <button class="toggle-btn" id="togglePanel">▼</button>
         </div>
 
         <div class="panel-body">
+            <!-- Live2D Model -->
+            <div class="form-group">
+                <label>Model VTuber</label>
+                <select id="modelSelect">
+                    <option value="https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@master/test/assets/haru/haru_greeter_t03.model3.json">Haru (anime school girl)</option>
+                    <option value="https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display@master/test/assets/shizuku/shizuku.model.json">Shizuku (anime girl, classic)</option>
+                    <option value="https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model@master/Bilibili-Live/22/22.model3.json">Bilibili 22 (cute boy)</option>
+                    <option value="https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model@master/Bilibili-Live/33/33.model3.json">Bilibili 33 (cute girl)</option>
+                    <option value="https://cdn.jsdelivr.net/gh/Eikanya/Live2d-model@master/Senko_Normals/senko.model3.json">Senko (kawaii fox)</option>
+                    <option value="custom">Custom URL...</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="customModelGroup" style="display:none;">
+                <label>Custom Model URL (.model3.json / .model.json)</label>
+                <input type="text" id="customModelUrl" placeholder="https://...model3.json">
+                <button class="reload-btn" id="loadModelBtn">Load Model</button>
+            </div>
+
             <!-- AI Provider -->
             <div class="form-group">
                 <label>Mode AI</label>
@@ -33,45 +61,39 @@
             <div class="form-group">
                 <label>Mode Suara</label>
                 <select id="ttsMode">
-                    <option value="browser">Browser TTS (gratis)</option>
-                    <option value="elevenlabs">ElevenLabs (lebih natural)</option>
+                    <option value="browser">Browser TTS (gratis, default)</option>
+                    <option value="elevenlabs">ElevenLabs (berbayar)</option>
                 </select>
             </div>
 
-            <!-- ElevenLabs config -->
             <div class="form-group elevenlabs-config" id="elevenlabsGroup" style="display:none;">
-                <label>ElevenLabs API Key <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">(daftar gratis)</a></label>
+                <label>ElevenLabs API Key <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">(perlu daftar)</a></label>
                 <input type="password" id="elevenApiKey" placeholder="sk_...">
             </div>
 
             <div class="form-group elevenlabs-config" id="elevenVoiceGroup" style="display:none;">
-                <label>Voice ID / Preset</label>
+                <label>Voice Preset</label>
                 <select id="elevenVoice">
-                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel (cewek, calm)</option>
-                    <option value="AZnzlk1XvdvUeBnXmlld">Domi (cewek, strong)</option>
                     <option value="EXAVITQu4vr4xnSDxMaL">Bella (cewek, soft)</option>
-                    <option value="ThT5KcBeYPX3keUQqHPh">Dorothy (cewek, british)</option>
-                    <option value="XB0fDUnXU5powFXDhCwa">Charlotte (cewek, seductive)</option>
                     <option value="pFZP5JQG7iQjIQuC4Bku">Lily (cewek, warm)</option>
+                    <option value="21m00Tcm4TlvDq8ikWAM">Rachel (cewek, calm)</option>
                     <option value="custom">Custom Voice ID...</option>
                 </select>
             </div>
 
             <div class="form-group elevenlabs-config" id="elevenCustomGroup" style="display:none;">
                 <label>Custom Voice ID</label>
-                <input type="text" id="elevenCustomId" placeholder="voice_id dari ElevenLabs">
+                <input type="text" id="elevenCustomId" placeholder="voice_id">
             </div>
 
             <div class="form-group elevenlabs-config" id="elevenModelGroup" style="display:none;">
                 <label>Model</label>
                 <select id="elevenModel">
-                    <option value="eleven_multilingual_v2">Multilingual v2 (best, support ID)</option>
-                    <option value="eleven_turbo_v2_5">Turbo v2.5 (cepat & multilingual)</option>
-                    <option value="eleven_flash_v2_5">Flash v2.5 (paling cepat)</option>
+                    <option value="eleven_multilingual_v2">Multilingual v2</option>
+                    <option value="eleven_turbo_v2_5">Turbo v2.5</option>
                 </select>
             </div>
 
-            <!-- Browser voice -->
             <div class="form-group browser-tts-config">
                 <label>Suara Browser</label>
                 <select id="voiceSelect"></select>
@@ -85,7 +107,7 @@
 
             <div class="form-group">
                 <label>Personality</label>
-                <textarea id="personality" rows="2">Aku Mira, AI ceria & ramah. Jawab singkat (max 2 kalimat) bahasa Indonesia santai.</textarea>
+                <textarea id="personality" rows="2">Aku Mira, VTuber AI ceria & ramah. Jawab singkat (max 2 kalimat) bahasa Indonesia santai.</textarea>
             </div>
 
             <div class="form-group inline">
@@ -96,6 +118,11 @@
             <div class="form-group inline">
                 <label>Speed <span id="rateVal">1.0</span></label>
                 <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1.0">
+            </div>
+
+            <div class="form-group inline">
+                <label>Size <span id="sizeVal">1.0</span></label>
+                <input type="range" id="modelSize" min="0.3" max="2" step="0.05" value="1.0">
             </div>
 
             <!-- Chat input -->
@@ -126,347 +153,38 @@
                 <label>Log Percakapan</label>
                 <div class="chat-log" id="chatLog"></div>
             </div>
+
+            <div class="form-group hint">
+                💡 <b>Tips:</b> Klik & drag avatar untuk pindahkan posisi. Tekan <b>H</b> untuk hide panel.
+            </div>
         </div>
     </div>
 
     <!-- Avatar Stage -->
     <div class="avatar-stage" id="avatarStage">
-        <!-- Background sparkles & effects -->
-        <div class="sparkles" id="sparkles"></div>
         <div class="bg-glow"></div>
+        <div class="sparkles" id="sparkles"></div>
 
         <!-- Speech Bubble -->
         <div class="speech-bubble" id="speechBubble">
             <span id="bubbleText"></span>
         </div>
 
-        <!-- Avatar (Genshin-style SVG) -->
-        <div class="avatar" id="avatar">
-            <svg viewBox="0 0 500 700" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" preserveAspectRatio="xMidYMid meet">
-                <defs>
-                    <!-- Hair gradient (Genshin-style with 3 stops + shine) -->
-                    <linearGradient id="hairGrad" x1="50%" y1="0%" x2="50%" y2="100%">
-                        <stop offset="0%" stop-color="#f0d4ff"/>
-                        <stop offset="30%" stop-color="#c19eff"/>
-                        <stop offset="70%" stop-color="#8b5fd9"/>
-                        <stop offset="100%" stop-color="#5a2d9b"/>
-                    </linearGradient>
-                    <linearGradient id="hairShine" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
-                        <stop offset="50%" stop-color="#ffffff" stop-opacity="0.2"/>
-                        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-                    </linearGradient>
-
-                    <!-- Skin gradient (soft anime) -->
-                    <radialGradient id="skinGrad" cx="50%" cy="35%" r="65%">
-                        <stop offset="0%" stop-color="#fff5ec"/>
-                        <stop offset="70%" stop-color="#ffe4d0"/>
-                        <stop offset="100%" stop-color="#f5c8a8"/>
-                    </radialGradient>
-
-                    <!-- Eye iris (Genshin signature multi-stop) -->
-                    <radialGradient id="eyeGrad" cx="50%" cy="40%" r="80%">
-                        <stop offset="0%" stop-color="#ffe4f8"/>
-                        <stop offset="20%" stop-color="#d8a8ff"/>
-                        <stop offset="50%" stop-color="#7e3ff2"/>
-                        <stop offset="85%" stop-color="#3a1e7a"/>
-                        <stop offset="100%" stop-color="#1a0d3a"/>
-                    </radialGradient>
-                    <linearGradient id="eyeBottom" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#7e3ff2" stop-opacity="0"/>
-                        <stop offset="100%" stop-color="#ff9ed6" stop-opacity="0.8"/>
-                    </linearGradient>
-
-                    <!-- Outfit gradient -->
-                    <linearGradient id="outfitGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#ffffff"/>
-                        <stop offset="50%" stop-color="#f3e8ff"/>
-                        <stop offset="100%" stop-color="#c4b5fd"/>
-                    </linearGradient>
-                    <linearGradient id="outfitDark" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#7c3aed"/>
-                        <stop offset="100%" stop-color="#4c1d95"/>
-                    </linearGradient>
-                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stop-color="#fde68a"/>
-                        <stop offset="50%" stop-color="#fbbf24"/>
-                        <stop offset="100%" stop-color="#d97706"/>
-                    </linearGradient>
-
-                    <!-- Cheek blush -->
-                    <radialGradient id="blushGrad" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#ff8aa8" stop-opacity="0.7"/>
-                        <stop offset="60%" stop-color="#ff8aa8" stop-opacity="0.3"/>
-                        <stop offset="100%" stop-color="#ff8aa8" stop-opacity="0"/>
-                    </radialGradient>
-
-                    <!-- Gem/vision gradient -->
-                    <radialGradient id="gemGrad" cx="40%" cy="30%" r="80%">
-                        <stop offset="0%" stop-color="#ffffff"/>
-                        <stop offset="40%" stop-color="#a78bfa"/>
-                        <stop offset="100%" stop-color="#5b21b6"/>
-                    </radialGradient>
-
-                    <!-- Filter for soft glow -->
-                    <filter id="softGlow">
-                        <feGaussianBlur stdDeviation="2" result="glow"/>
-                        <feMerge>
-                            <feMergeNode in="glow"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
-
-                <!-- ============================================ -->
-                <!-- BACKGROUND HAIR (long flowing, behind body) -->
-                <!-- ============================================ -->
-                <g class="hair-back-group">
-                    <!-- Main back hair mass -->
-                    <path d="M 130 220
-                             C 80 280, 70 380, 90 480
-                             C 100 540, 120 580, 150 600
-                             L 350 600
-                             C 380 580, 400 540, 410 480
-                             C 430 380, 420 280, 370 220
-                             C 350 200, 150 200, 130 220 Z"
-                          fill="url(#hairGrad)"/>
-                    <!-- Hair strand left -->
-                    <path d="M 95 350 C 70 430, 75 520, 110 600 L 140 600 C 130 510, 125 420, 130 360 Z"
-                          fill="url(#hairGrad)" opacity="0.95"/>
-                    <!-- Hair strand right -->
-                    <path d="M 405 350 C 430 430, 425 520, 390 600 L 360 600 C 370 510, 375 420, 370 360 Z"
-                          fill="url(#hairGrad)" opacity="0.95"/>
-                    <!-- Back hair shine highlights -->
-                    <path d="M 160 280 C 155 360, 160 450, 175 540" stroke="url(#hairShine)" stroke-width="14" fill="none" stroke-linecap="round"/>
-                    <path d="M 340 280 C 345 360, 340 450, 325 540" stroke="url(#hairShine)" stroke-width="14" fill="none" stroke-linecap="round"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- NECK -->
-                <!-- ============================================ -->
-                <path d="M 220 410 L 220 460 Q 250 478 280 460 L 280 410 Z"
-                      fill="url(#skinGrad)"/>
-                <!-- Neck shadow -->
-                <path d="M 220 410 L 220 430 Q 250 442 280 430 L 280 410 Z"
-                      fill="#e8a98a" opacity="0.3"/>
-
-                <!-- ============================================ -->
-                <!-- BODY / OUTFIT (Genshin-style with frills) -->
-                <!-- ============================================ -->
-                <g class="outfit">
-                    <!-- Shoulders/chest plate -->
-                    <path d="M 150 470
-                             Q 250 510 350 470
-                             L 380 580
-                             L 400 700
-                             L 100 700
-                             L 120 580 Z"
-                          fill="url(#outfitGrad)" stroke="#7c3aed" stroke-width="2.5"/>
-
-                    <!-- Dark inner collar/neckline -->
-                    <path d="M 200 470 Q 250 495 300 470 L 290 530 Q 250 545 210 530 Z"
-                          fill="url(#outfitDark)"/>
-
-                    <!-- Gold trim on collar -->
-                    <path d="M 195 472 Q 250 498 305 472" stroke="url(#goldGrad)" stroke-width="3" fill="none"/>
-
-                    <!-- Gem on chest (Genshin vision style) -->
-                    <g class="vision-gem">
-                        <circle cx="250" cy="510" r="12" fill="url(#gemGrad)" stroke="#fbbf24" stroke-width="2"/>
-                        <polygon points="250,500 256,510 250,520 244,510" fill="#ffffff" opacity="0.7"/>
-                    </g>
-
-                    <!-- Decorative gold lines on outfit -->
-                    <path d="M 140 540 Q 250 560 360 540" stroke="url(#goldGrad)" stroke-width="2" fill="none"/>
-                    <path d="M 130 600 L 370 600" stroke="url(#goldGrad)" stroke-width="2.5" fill="none"/>
-
-                    <!-- Frill at bottom -->
-                    <path d="M 100 700 Q 130 690 160 700 Q 190 690 220 700 Q 250 690 280 700 Q 310 690 340 700 Q 370 690 400 700"
-                          stroke="#7c3aed" stroke-width="2" fill="none"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- HEAD / FACE (anime soft round) -->
-                <!-- ============================================ -->
-                <g class="head">
-                    <!-- Main face shape -->
-                    <path d="M 165 240
-                             C 158 310, 175 380, 215 410
-                             C 230 420, 270 420, 285 410
-                             C 325 380, 342 310, 335 240
-                             C 320 180, 180 180, 165 240 Z"
-                          fill="url(#skinGrad)" stroke="#d4a48a" stroke-width="1.5"/>
-
-                    <!-- Soft chin shadow -->
-                    <path d="M 215 405 C 230 415, 270 415, 285 405 C 280 412, 220 412, 215 405 Z"
-                          fill="#e8a98a" opacity="0.3"/>
-
-                    <!-- Ears -->
-                    <path d="M 158 295 Q 145 305 152 330 Q 162 322 162 305 Z"
-                          fill="url(#skinGrad)" stroke="#d4a48a" stroke-width="1.5"/>
-                    <path d="M 342 295 Q 355 305 348 330 Q 338 322 338 305 Z"
-                          fill="url(#skinGrad)" stroke="#d4a48a" stroke-width="1.5"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- HAIR FRONT (Genshin-style layered bangs) -->
-                <!-- ============================================ -->
-                <g class="hair-front">
-                    <!-- Main center bangs -->
-                    <path d="M 145 240
-                             C 140 160, 200 110, 250 105
-                             C 300 110, 360 160, 355 240
-                             C 350 250, 320 252, 305 248
-                             L 295 218
-                             C 290 235, 275 245, 260 250
-                             L 255 215
-                             C 245 235, 230 245, 215 250
-                             L 210 218
-                             C 195 245, 165 252, 145 240 Z"
-                          fill="url(#hairGrad)"/>
-
-                    <!-- Side hair strands left -->
-                    <path d="M 145 235
-                             C 130 290, 128 360, 138 420
-                             C 145 415, 150 380, 152 320
-                             C 152 280, 150 250, 148 235 Z"
-                          fill="url(#hairGrad)"/>
-
-                    <!-- Side hair strands right -->
-                    <path d="M 355 235
-                             C 370 290, 372 360, 362 420
-                             C 355 415, 350 380, 348 320
-                             C 348 280, 350 250, 352 235 Z"
-                          fill="url(#hairGrad)"/>
-
-                    <!-- Inner side strand left (shorter) -->
-                    <path d="M 175 230
-                             C 170 280, 175 330, 185 365
-                             C 195 360, 195 320, 192 270 Z"
-                          fill="url(#hairGrad)" opacity="0.95"/>
-
-                    <!-- Inner side strand right -->
-                    <path d="M 325 230
-                             C 330 280, 325 330, 315 365
-                             C 305 360, 305 320, 308 270 Z"
-                          fill="url(#hairGrad)" opacity="0.95"/>
-
-                    <!-- Ahoge (signature hair antenna) -->
-                    <path d="M 240 110
-                             C 235 80, 250 70, 265 75
-                             C 270 90, 260 105, 250 110 Z"
-                          fill="url(#hairGrad)"/>
-
-                    <!-- Hair shine highlights (Genshin-style horizontal bands) -->
-                    <ellipse cx="220" cy="170" rx="40" ry="6" fill="#ffffff" opacity="0.5" transform="rotate(-12 220 170)"/>
-                    <ellipse cx="290" cy="175" rx="32" ry="5" fill="#ffffff" opacity="0.4" transform="rotate(8 290 175)"/>
-                    <ellipse cx="250" cy="150" rx="20" ry="4" fill="#ffffff" opacity="0.6"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- HAIR ORNAMENT (gold flower/star) -->
-                <!-- ============================================ -->
-                <g class="hair-ornament" transform="translate(310 165)">
-                    <!-- Outer petals -->
-                    <g fill="url(#goldGrad)" stroke="#92400e" stroke-width="1">
-                        <ellipse cx="0" cy="-12" rx="6" ry="9"/>
-                        <ellipse cx="11" cy="-4" rx="6" ry="9" transform="rotate(60)"/>
-                        <ellipse cx="11" cy="4" rx="6" ry="9" transform="rotate(120)"/>
-                        <ellipse cx="0" cy="12" rx="6" ry="9"/>
-                        <ellipse cx="-11" cy="4" rx="6" ry="9" transform="rotate(60)"/>
-                        <ellipse cx="-11" cy="-4" rx="6" ry="9" transform="rotate(120)"/>
-                    </g>
-                    <!-- Center gem -->
-                    <circle cx="0" cy="0" r="6" fill="url(#gemGrad)" stroke="#92400e" stroke-width="1.5"/>
-                    <circle cx="-2" cy="-2" r="2" fill="#ffffff"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- FACE FEATURES -->
-                <!-- ============================================ -->
-                <!-- Cheek blush -->
-                <ellipse cx="195" cy="335" rx="22" ry="10" fill="url(#blushGrad)"/>
-                <ellipse cx="305" cy="335" rx="22" ry="10" fill="url(#blushGrad)"/>
-
-                <!-- Eyebrows -->
-                <path d="M 188 268 Q 205 263 222 268" stroke="#5a2d9b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-                <path d="M 278 268 Q 295 263 312 268" stroke="#5a2d9b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-
-                <!-- ============================================ -->
-                <!-- EYES (Genshin-style detailed) -->
-                <!-- ============================================ -->
-                <!-- LEFT EYE -->
-                <g class="eye left">
-                    <!-- Eye white -->
-                    <ellipse cx="205" cy="305" rx="26" ry="32" fill="#ffffff"/>
-                    <!-- Top eyelid line -->
-                    <path d="M 178 290 Q 205 278 232 290" stroke="#3d1a78" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-                    <!-- Bottom eyelid line (thin) -->
-                    <path d="M 184 322 Q 205 330 226 322" stroke="#7c3aed" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
-                    <!-- Iris (the colored part) -->
-                    <ellipse class="eyeball" cx="205" cy="308" rx="20" ry="26" fill="url(#eyeGrad)"/>
-                    <!-- Iris bottom highlight -->
-                    <ellipse cx="205" cy="320" rx="18" ry="14" fill="url(#eyeBottom)" opacity="0.7"/>
-                    <!-- Pupil -->
-                    <ellipse class="pupil" cx="205" cy="310" rx="6" ry="10" fill="#1a0d3a"/>
-                    <!-- Big shine top -->
-                    <ellipse cx="198" cy="295" rx="7" ry="9" fill="#ffffff"/>
-                    <!-- Star shine (Genshin signature) -->
-                    <circle cx="213" cy="300" r="3" fill="#ffffff"/>
-                    <!-- Small bottom shine -->
-                    <ellipse cx="210" cy="322" rx="3" ry="4" fill="#ffffff" opacity="0.8"/>
-                    <!-- Eyelash flicks -->
-                    <path d="M 178 287 L 175 280" stroke="#1a0d3a" stroke-width="2.5" stroke-linecap="round"/>
-                    <path d="M 184 281 L 182 275" stroke="#1a0d3a" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M 232 287 L 235 280" stroke="#1a0d3a" stroke-width="2.5" stroke-linecap="round"/>
-                    <!-- Eyelid for blink (animated) -->
-                    <ellipse class="eyelid" cx="205" cy="305" rx="27" ry="0" fill="url(#skinGrad)"/>
-                </g>
-
-                <!-- RIGHT EYE -->
-                <g class="eye right">
-                    <ellipse cx="295" cy="305" rx="26" ry="32" fill="#ffffff"/>
-                    <path d="M 268 290 Q 295 278 322 290" stroke="#3d1a78" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-                    <path d="M 274 322 Q 295 330 316 322" stroke="#7c3aed" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
-                    <ellipse class="eyeball" cx="295" cy="308" rx="20" ry="26" fill="url(#eyeGrad)"/>
-                    <ellipse cx="295" cy="320" rx="18" ry="14" fill="url(#eyeBottom)" opacity="0.7"/>
-                    <ellipse class="pupil" cx="295" cy="310" rx="6" ry="10" fill="#1a0d3a"/>
-                    <ellipse cx="288" cy="295" rx="7" ry="9" fill="#ffffff"/>
-                    <circle cx="303" cy="300" r="3" fill="#ffffff"/>
-                    <ellipse cx="300" cy="322" rx="3" ry="4" fill="#ffffff" opacity="0.8"/>
-                    <path d="M 268 287 L 265 280" stroke="#1a0d3a" stroke-width="2.5" stroke-linecap="round"/>
-                    <path d="M 274 281 L 272 275" stroke="#1a0d3a" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M 322 287 L 325 280" stroke="#1a0d3a" stroke-width="2.5" stroke-linecap="round"/>
-                    <ellipse class="eyelid" cx="295" cy="305" rx="27" ry="0" fill="url(#skinGrad)"/>
-                </g>
-
-                <!-- Tiny nose -->
-                <path d="M 250 350 Q 247 358 251 360 Q 253 358 250 350" fill="#e8a98a" opacity="0.5"/>
-
-                <!-- ============================================ -->
-                <!-- MOUTH (animated for lip sync) -->
-                <!-- ============================================ -->
-                <g id="mouth" class="mouth">
-                    <path class="mouth-shape" d="M 240 380 Q 250 384 260 380" stroke="#c2185b" stroke-width="2.5" fill="#ff6b9d" stroke-linecap="round"/>
-                </g>
-
-                <!-- ============================================ -->
-                <!-- FOREHEAD GEM (small accent) -->
-                <!-- ============================================ -->
-                <g class="forehead-gem">
-                    <polygon points="250,225 257,235 250,245 243,235" fill="url(#gemGrad)" stroke="#5b21b6" stroke-width="1.5"/>
-                    <polygon points="250,228 254,235 250,242 246,235" fill="#ffffff" opacity="0.6"/>
-                </g>
-            </svg>
-
-            <div class="reactions" id="reactions"></div>
+        <!-- Live2D Canvas -->
+        <div class="avatar-container" id="avatarContainer">
+            <canvas id="live2dCanvas"></canvas>
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+                <div>Memuat model VTuber...</div>
+            </div>
         </div>
 
+        <div class="reactions" id="reactions"></div>
         <div class="status" id="status">Idle</div>
     </div>
 
-    <!-- Hidden audio element for ElevenLabs playback -->
-    <audio id="ttsAudio" style="display:none;"></audio>
+    <!-- Hidden audio element for ElevenLabs -->
+    <audio id="ttsAudio" crossorigin="anonymous" style="display:none;"></audio>
 
     <script src="app.js"></script>
 </body>

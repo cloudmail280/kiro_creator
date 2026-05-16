@@ -1,11 +1,13 @@
 /* ============================================
-   Avatar AI - Genshin Style + ElevenLabs TTS
+   VTuber Avatar AI - Live2D + TTS
+   Kobo-Kanaeru style VTuber experience
    ============================================ */
 
-// ----------- DOM References -----------
+// ----------- DOM -----------
 const els = {
-    avatar: document.getElementById('avatar'),
-    mouth: document.getElementById('mouth'),
+    canvas: document.getElementById('live2dCanvas'),
+    avatarContainer: document.getElementById('avatarContainer'),
+    loading: document.getElementById('loadingOverlay'),
     bubble: document.getElementById('speechBubble'),
     bubbleText: document.getElementById('bubbleText'),
     status: document.getElementById('status'),
@@ -14,6 +16,10 @@ const els = {
     chatLog: document.getElementById('chatLog'),
     userMsg: document.getElementById('userMsg'),
     sendBtn: document.getElementById('sendBtn'),
+    modelSelect: document.getElementById('modelSelect'),
+    customModelGroup: document.getElementById('customModelGroup'),
+    customModelUrl: document.getElementById('customModelUrl'),
+    loadModelBtn: document.getElementById('loadModelBtn'),
     aiMode: document.getElementById('aiMode'),
     apiKeyGroup: document.getElementById('apiKeyGroup'),
     apiKey: document.getElementById('apiKey'),
@@ -21,8 +27,8 @@ const els = {
     elevenApiKey: document.getElementById('elevenApiKey'),
     elevenVoice: document.getElementById('elevenVoice'),
     elevenCustomId: document.getElementById('elevenCustomId'),
-    elevenModel: document.getElementById('elevenModel'),
     elevenCustomGroup: document.getElementById('elevenCustomGroup'),
+    elevenModel: document.getElementById('elevenModel'),
     avatarName: document.getElementById('avatarName'),
     personality: document.getElementById('personality'),
     voiceSelect: document.getElementById('voiceSelect'),
@@ -30,6 +36,8 @@ const els = {
     pitchVal: document.getElementById('pitchVal'),
     rate: document.getElementById('rate'),
     rateVal: document.getElementById('rateVal'),
+    modelSize: document.getElementById('modelSize'),
+    sizeVal: document.getElementById('sizeVal'),
     obsBtn: document.getElementById('obsMode'),
     settingsPanel: document.getElementById('settingsPanel'),
     togglePanel: document.getElementById('togglePanel'),
@@ -41,11 +49,21 @@ const els = {
 const state = {
     speaking: false,
     voices: [],
+    pixiApp: null,
+    model: null,
+    audioContext: null,
+    analyser: null,
+    audioSource: null,
+    lipSyncRunning: false,
 };
 
-// ----------- Settings persistence -----------
+// ============================================
+// SETTINGS
+// ============================================
 function loadSettings() {
-    const saved = JSON.parse(localStorage.getItem('avatarSettings') || '{}');
+    const saved = JSON.parse(localStorage.getItem('vtuberSettings') || '{}');
+    if (saved.modelUrl) els.modelSelect.value = saved.modelUrl;
+    if (saved.customModelUrl) els.customModelUrl.value = saved.customModelUrl;
     if (saved.aiMode) els.aiMode.value = saved.aiMode;
     if (saved.apiKey) els.apiKey.value = saved.apiKey;
     if (saved.ttsMode) els.ttsMode.value = saved.ttsMode;
@@ -57,13 +75,17 @@ function loadSettings() {
     if (saved.personality) els.personality.value = saved.personality;
     if (saved.pitch) els.pitch.value = saved.pitch;
     if (saved.rate) els.rate.value = saved.rate;
+    if (saved.modelSize) els.modelSize.value = saved.modelSize;
     els.pitchVal.textContent = els.pitch.value;
     els.rateVal.textContent = els.rate.value;
+    els.sizeVal.textContent = els.modelSize.value;
     updateUIVisibility();
 }
 
 function saveSettings() {
-    localStorage.setItem('avatarSettings', JSON.stringify({
+    localStorage.setItem('vtuberSettings', JSON.stringify({
+        modelUrl: els.modelSelect.value,
+        customModelUrl: els.customModelUrl.value,
         aiMode: els.aiMode.value,
         apiKey: els.apiKey.value,
         ttsMode: els.ttsMode.value,
@@ -75,15 +97,13 @@ function saveSettings() {
         personality: els.personality.value,
         pitch: els.pitch.value,
         rate: els.rate.value,
+        modelSize: els.modelSize.value,
         voice: els.voiceSelect.value,
     }));
 }
 
 function updateUIVisibility() {
-    // Show/hide Gemini API key
     els.apiKeyGroup.style.display = els.aiMode.value === 'gemini' ? 'block' : 'none';
-
-    // Show/hide ElevenLabs config
     const isElevenLabs = els.ttsMode.value === 'elevenlabs';
     document.querySelectorAll('.elevenlabs-config').forEach(el => {
         el.style.display = isElevenLabs ? 'block' : 'none';
@@ -91,13 +111,261 @@ function updateUIVisibility() {
     document.querySelectorAll('.browser-tts-config').forEach(el => {
         el.style.display = isElevenLabs ? 'none' : 'block';
     });
-
-    // Custom voice ID input
     els.elevenCustomGroup.style.display =
         (isElevenLabs && els.elevenVoice.value === 'custom') ? 'block' : 'none';
+    els.customModelGroup.style.display = els.modelSelect.value === 'custom' ? 'block' : 'none';
 }
 
-// ----------- Browser Voice Setup -----------
+// ============================================
+// LIVE2D MODEL LOADER
+// ============================================
+async function initPixi() {
+    if (state.pixiApp) return state.pixiApp;
+
+    const containerWidth = els.avatarContainer.clientWidth;
+    const containerHeight = els.avatarContainer.clientHeight;
+
+    state.pixiApp = new PIXI.Application({
+        view: els.canvas,
+        width: containerWidth,
+        height: containerHeight,
+        backgroundAlpha: 0,
+        antialias: true,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+    });
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+        if (!state.pixiApp) return;
+        state.pixiApp.renderer.resize(els.avatarContainer.clientWidth, els.avatarContainer.clientHeight);
+        if (state.model) {
+            positionModel(state.model);
+        }
+    });
+
+    return state.pixiApp;
+}
+
+function positionModel(model) {
+    if (!model || !state.pixiApp) return;
+    const w = state.pixiApp.renderer.width / state.pixiApp.renderer.resolution;
+    const h = state.pixiApp.renderer.height / state.pixiApp.renderer.resolution;
+    const sizeFactor = parseFloat(els.modelSize.value);
+
+    // Fit model to canvas
+    const scale = Math.min(w / model.width, h / model.height) * 0.9 * sizeFactor;
+    model.scale.set(scale);
+
+    // Center horizontally, anchor at bottom
+    model.x = w / 2 - model.width / 2;
+    model.y = h - model.height + (h * 0.05);
+}
+
+async function loadModel(modelUrl) {
+    showLoading('Memuat model VTuber...');
+
+    try {
+        await initPixi();
+
+        // Remove existing model
+        if (state.model) {
+            state.pixiApp.stage.removeChild(state.model);
+            state.model.destroy();
+            state.model = null;
+        }
+
+        // Use the global Live2DModel from pixi-live2d-display
+        const Live2DModel = window.PIXI.live2d.Live2DModel;
+
+        const model = await Live2DModel.from(modelUrl, {
+            autoInteract: true,
+            autoUpdate: true,
+        });
+
+        state.pixiApp.stage.addChild(model);
+        state.model = model;
+
+        positionModel(model);
+
+        // Make model draggable
+        model.interactive = true;
+        let dragData = null;
+        model.on('pointerdown', (e) => {
+            dragData = { x: e.data.global.x - model.x, y: e.data.global.y - model.y };
+        });
+        model.on('pointermove', (e) => {
+            if (dragData) {
+                model.x = e.data.global.x - dragData.x;
+                model.y = e.data.global.y - dragData.y;
+            }
+        });
+        model.on('pointerup', () => { dragData = null; });
+        model.on('pointerupoutside', () => { dragData = null; });
+
+        // Tap interaction (when not dragging)
+        let dragStart = null;
+        model.on('pointerdown', (e) => {
+            dragStart = { x: e.data.global.x, y: e.data.global.y, time: Date.now() };
+        });
+        model.on('pointerup', (e) => {
+            if (!dragStart) return;
+            const dx = Math.abs(e.data.global.x - dragStart.x);
+            const dy = Math.abs(e.data.global.y - dragStart.y);
+            const dt = Date.now() - dragStart.time;
+            // If quick tap (small movement, fast)
+            if (dx < 5 && dy < 5 && dt < 300 && !state.speaking) {
+                spawnReaction('💖', 3);
+                triggerExpression('happy');
+            }
+            dragStart = null;
+        });
+
+        hideLoading();
+        setStatus('Idle');
+        logMessage('ai', `Model "${modelUrl.split('/').pop().slice(0, 30)}" berhasil dimuat!`);
+        return true;
+    } catch (e) {
+        console.error('Load model failed:', e);
+        hideLoading();
+        setStatus('Error load model');
+        logMessage('ai', `[ERROR Model] ${e.message}`);
+        return false;
+    }
+}
+
+function showLoading(text) {
+    els.loading.style.display = 'flex';
+    els.loading.querySelector('div:last-child').textContent = text || 'Loading...';
+}
+
+function hideLoading() {
+    els.loading.style.display = 'none';
+}
+
+// ============================================
+// LIVE2D MOUTH CONTROL (Lip Sync)
+// ============================================
+function setMouthOpen(value) {
+    if (!state.model) return;
+    // Try multiple parameter names (different model formats)
+    const params = ['ParamMouthOpenY', 'PARAM_MOUTH_OPEN_Y', 'PARAM_MOUTH_OPEN'];
+    for (const param of params) {
+        try {
+            state.model.internalModel.coreModel.setParameterValueById(param, value);
+        } catch (e) { /* try next */ }
+    }
+}
+
+function triggerExpression(name) {
+    if (!state.model) return;
+    try {
+        // Try motion first (random idle/tap)
+        if (state.model.internalModel.motionManager) {
+            const motions = state.model.internalModel.motionManager.definitions;
+            if (motions) {
+                const groups = Object.keys(motions);
+                if (groups.length > 0) {
+                    // Try tap_body / tap / happy groups
+                    const preferred = groups.find(g =>
+                        g.toLowerCase().includes('tap') ||
+                        g.toLowerCase().includes('happy')
+                    ) || groups[0];
+                    state.model.motion(preferred);
+                }
+            }
+        }
+        // Try expression
+        if (state.model.expression) {
+            state.model.expression();
+        }
+    } catch (e) {
+        console.warn('Expression error:', e);
+    }
+}
+
+// ============================================
+// AUDIO-BASED LIP SYNC
+// ============================================
+function startAudioLipSync(audioElement) {
+    try {
+        if (!state.audioContext) {
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (state.audioContext.state === 'suspended') {
+            state.audioContext.resume();
+        }
+
+        // Create new source for the audio element (only once per element)
+        if (!audioElement._mediaSource) {
+            audioElement._mediaSource = state.audioContext.createMediaElementSource(audioElement);
+            state.analyser = state.audioContext.createAnalyser();
+            state.analyser.fftSize = 256;
+            state.analyser.smoothingTimeConstant = 0.5;
+            audioElement._mediaSource.connect(state.analyser);
+            state.analyser.connect(state.audioContext.destination);
+        }
+
+        const dataArray = new Uint8Array(state.analyser.frequencyBinCount);
+        state.lipSyncRunning = true;
+
+        const tick = () => {
+            if (!state.lipSyncRunning) {
+                setMouthOpen(0);
+                return;
+            }
+            state.analyser.getByteFrequencyData(dataArray);
+            // Average volume → mouth open value (0..1)
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+            const mouthValue = Math.min(1, avg / 80);
+            setMouthOpen(mouthValue);
+            requestAnimationFrame(tick);
+        };
+        tick();
+    } catch (e) {
+        console.warn('Audio lip sync setup failed, falling back to text-based:', e);
+        startTextLipSync();
+    }
+}
+
+function stopAudioLipSync() {
+    state.lipSyncRunning = false;
+    setMouthOpen(0);
+}
+
+// Fallback text-based lip sync (for browser TTS which doesn't expose audio)
+let textLipSyncTimer = null;
+function startTextLipSync(durationMs = 5000) {
+    stopTextLipSync();
+    const startTime = Date.now();
+    const tick = () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= durationMs) {
+            stopTextLipSync();
+            return;
+        }
+        // Oscillate mouth open value rapidly to simulate talking
+        const t = elapsed / 100;
+        const mouthValue = 0.3 + 0.7 * Math.abs(Math.sin(t)) * Math.random();
+        setMouthOpen(Math.min(1, mouthValue));
+        textLipSyncTimer = requestAnimationFrame(tick);
+    };
+    tick();
+}
+
+function stopTextLipSync() {
+    if (textLipSyncTimer) {
+        cancelAnimationFrame(textLipSyncTimer);
+        textLipSyncTimer = null;
+    }
+    setMouthOpen(0);
+}
+
+// ============================================
+// BROWSER TTS
+// ============================================
 function loadVoices() {
     state.voices = window.speechSynthesis.getVoices();
     els.voiceSelect.innerHTML = '';
@@ -112,7 +380,7 @@ function loadVoices() {
         opt.textContent = `${voice.name} (${voice.lang})`;
         els.voiceSelect.appendChild(opt);
     });
-    const saved = JSON.parse(localStorage.getItem('avatarSettings') || '{}');
+    const saved = JSON.parse(localStorage.getItem('vtuberSettings') || '{}');
     if (saved.voice && state.voices.find(v => v.name === saved.voice)) {
         els.voiceSelect.value = saved.voice;
     }
@@ -123,72 +391,13 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 
-// ----------- Lip Sync (SVG path animation) -----------
-const MOUTH_PATHS = {
-    'closed': 'M 240 380 Q 250 384 260 380',
-    'a':      'M 234 376 Q 250 408 266 376 Q 250 392 234 376',
-    'i':      'M 232 380 Q 250 388 268 380 Q 250 384 232 380',
-    'u':      'M 244 378 Q 250 394 256 378 Q 250 388 244 378',
-    'e':      'M 238 378 Q 250 398 262 378 Q 250 392 238 378',
-    'o':      'M 238 374 Q 250 402 262 374 Q 250 392 238 374',
-    'happy':  'M 230 374 Q 250 402 270 374',
-};
-
-function getMouthShapeForChar(ch) {
-    ch = ch.toLowerCase();
-    if ('a'.includes(ch)) return 'a';
-    if ('iey'.includes(ch)) return 'i';
-    if ('u'.includes(ch)) return 'u';
-    if ('o'.includes(ch)) return 'o';
-    if (' .,!?'.includes(ch)) return 'closed';
-    return 'e';
-}
-
-let lipSyncTimer = null;
-function startLipSync(text, durationMs = null) {
-    stopLipSync();
-    const chars = text.split('');
-    let i = 0;
-    // If we know total duration (ElevenLabs audio), distribute evenly
-    const interval = durationMs
-        ? Math.max(60, durationMs / chars.length)
-        : Math.max(70, 100 / parseFloat(els.rate.value));
-
-    lipSyncTimer = setInterval(() => {
-        if (i >= chars.length) {
-            stopLipSync();
-            return;
-        }
-        setMouth(getMouthShapeForChar(chars[i]));
-        i++;
-    }, interval);
-}
-
-function stopLipSync() {
-    if (lipSyncTimer) {
-        clearInterval(lipSyncTimer);
-        lipSyncTimer = null;
-    }
-    setMouth('closed');
-}
-
-function setMouth(shape) {
-    const mouthShape = els.mouth.querySelector('.mouth-shape');
-    if (mouthShape && MOUTH_PATHS[shape]) {
-        mouthShape.setAttribute('d', MOUTH_PATHS[shape]);
-    }
-}
-
-// ----------- Speak (Browser TTS) -----------
 function speakBrowser(text) {
     return new Promise((resolve) => {
         if (!('speechSynthesis' in window)) {
-            console.warn('Speech Synthesis not supported');
             showBubble(text, 4000);
             setTimeout(resolve, 4000);
             return;
         }
-
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         const voice = state.voices.find(v => v.name === els.voiceSelect.value);
@@ -197,52 +406,43 @@ function speakBrowser(text) {
         utterance.rate = parseFloat(els.rate.value);
         utterance.lang = voice ? voice.lang : 'id-ID';
 
+        // Estimate duration for lip sync
+        const estimatedMs = (text.length / 12) * 1000 / parseFloat(els.rate.value);
+
         utterance.onstart = () => {
             state.speaking = true;
-            els.avatar.classList.add('talking');
             setStatus('Bicara...');
-            startLipSync(text);
+            startTextLipSync(estimatedMs + 500);
             showBubble(text, 0);
         };
-        utterance.onend = () => {
-            finishSpeaking();
-            resolve();
-        };
-        utterance.onerror = () => {
-            finishSpeaking();
-            resolve();
-        };
-
+        utterance.onend = () => { finishSpeaking(); resolve(); };
+        utterance.onerror = () => { finishSpeaking(); resolve(); };
         window.speechSynthesis.speak(utterance);
     });
 }
 
 function finishSpeaking() {
     state.speaking = false;
-    els.avatar.classList.remove('talking');
-    stopLipSync();
+    stopAudioLipSync();
+    stopTextLipSync();
     hideBubble();
     setStatus('Idle');
 }
 
-// ----------- Speak (ElevenLabs) -----------
+// ============================================
+// ELEVENLABS TTS
+// ============================================
 async function speakElevenLabs(text) {
     const apiKey = els.elevenApiKey.value.trim();
     if (!apiKey) {
-        logMessage('ai', '[ERROR] ElevenLabs API Key kosong, fallback ke Browser TTS');
+        logMessage('ai', '[INFO] ElevenLabs key kosong, pakai Browser TTS');
         return speakBrowser(text);
     }
-
     let voiceId = els.elevenVoice.value;
     if (voiceId === 'custom') {
         voiceId = els.elevenCustomId.value.trim();
-        if (!voiceId) {
-            logMessage('ai', '[ERROR] Voice ID custom kosong, fallback ke Browser TTS');
-            return speakBrowser(text);
-        }
+        if (!voiceId) return speakBrowser(text);
     }
-
-    const model = els.elevenModel.value || 'eleven_multilingual_v2';
 
     setStatus('Loading audio...');
     showBubble(text, 0);
@@ -258,94 +458,70 @@ async function speakElevenLabs(text) {
             },
             body: JSON.stringify({
                 text: text,
-                model_id: model,
-                voice_settings: {
-                    stability: 0.5,
-                    similarity_boost: 0.75,
-                    style: 0.4,
-                    use_speaker_boost: true,
-                },
+                model_id: els.elevenModel.value || 'eleven_multilingual_v2',
+                voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.4, use_speaker_boost: true },
             }),
         });
 
         if (!res.ok) {
-            const errBody = await res.text();
-            logMessage('ai', `[ERROR ElevenLabs ${res.status}] ${errBody.slice(0, 150)}`);
-            // Fallback to browser TTS
+            const err = await res.text();
+            logMessage('ai', `[ERROR ElevenLabs ${res.status}] ${err.slice(0, 100)}`);
             hideBubble();
             return speakBrowser(text);
         }
 
-        const audioBlob = await res.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
+        const blob = await res.blob();
+        const audioUrl = URL.createObjectURL(blob);
 
         return new Promise((resolve) => {
             els.ttsAudio.src = audioUrl;
-
-            els.ttsAudio.onloadedmetadata = () => {
-                const durationMs = els.ttsAudio.duration * 1000;
+            els.ttsAudio.onplay = () => {
                 state.speaking = true;
-                els.avatar.classList.add('talking');
                 setStatus('Bicara (ElevenLabs)...');
-                startLipSync(text, durationMs);
+                startAudioLipSync(els.ttsAudio);
             };
-
             els.ttsAudio.onended = () => {
                 URL.revokeObjectURL(audioUrl);
                 finishSpeaking();
                 resolve();
             };
-
             els.ttsAudio.onerror = () => {
                 URL.revokeObjectURL(audioUrl);
                 finishSpeaking();
-                logMessage('ai', '[ERROR] Audio playback gagal, fallback ke Browser TTS');
                 speakBrowser(text).then(resolve);
             };
-
             els.ttsAudio.play().catch(err => {
-                console.error('Play failed:', err);
+                console.error(err);
                 finishSpeaking();
-                logMessage('ai', '[ERROR] Auto-play diblokir, klik avatar dulu');
+                logMessage('ai', '[INFO] Auto-play diblokir, klik avatar dulu');
                 resolve();
             });
         });
     } catch (e) {
-        console.error('ElevenLabs error:', e);
         hideBubble();
-        logMessage('ai', `[ERROR] ${e.message}, fallback ke Browser TTS`);
+        logMessage('ai', `[ERROR] ${e.message}`);
         return speakBrowser(text);
     }
 }
 
-// Universal speak function
 async function speak(text) {
-    if (els.ttsMode.value === 'elevenlabs') {
-        return speakElevenLabs(text);
-    }
+    if (els.ttsMode.value === 'elevenlabs') return speakElevenLabs(text);
     return speakBrowser(text);
 }
 
-// ----------- Speech Bubble -----------
+// ============================================
+// UI HELPERS
+// ============================================
 let bubbleTimer = null;
 function showBubble(text, autoHideMs = 3000) {
     if (bubbleTimer) clearTimeout(bubbleTimer);
     els.bubbleText.textContent = text;
     els.bubble.classList.add('show');
-    if (autoHideMs > 0) {
-        bubbleTimer = setTimeout(hideBubble, autoHideMs);
-    }
+    if (autoHideMs > 0) bubbleTimer = setTimeout(hideBubble, autoHideMs);
 }
+function hideBubble() { els.bubble.classList.remove('show'); }
+function setStatus(text) { els.status.textContent = text; }
 
-function hideBubble() {
-    els.bubble.classList.remove('show');
-}
-
-function setStatus(text) {
-    els.status.textContent = text;
-}
-
-// ----------- Chat Log -----------
 function logMessage(who, text) {
     const div = document.createElement('div');
     div.className = who === 'user' ? 'msg-user' : 'msg-ai';
@@ -354,7 +530,9 @@ function logMessage(who, text) {
     els.chatLog.scrollTop = els.chatLog.scrollHeight;
 }
 
-// ----------- AI Brain -----------
+// ============================================
+// AI BRAIN
+// ============================================
 const DEMO_RESPONSES = [
     'Halo halo penonton! Apa kabar hari ini? ✨',
     'Wahh seru banget! Makasih ya udah nonton aku!',
@@ -368,75 +546,54 @@ const DEMO_RESPONSES = [
     'Wkwkwk kocak banget sumpah!',
     'Kamu yang terbaik deh pokoknya!',
     'Iyaaa aku ngerti, sabar ya~',
-    'Ohh begituu, makasih udah kasih tau!',
-    'Eitss jangan gitu dong, hihi~',
-    'Wuaa aku senang banget hari ini bareng kalian!',
 ];
 
-const GEMINI_MODELS = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
-    'gemini-pro',
-];
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-pro'];
 
-async function callGeminiAPI(userText, systemPrompt, apiKey) {
-    let lastError = null;
+async function callGemini(text, prompt, key) {
+    let lastErr = null;
     for (const model of GEMINI_MODELS) {
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const res = await fetch(url, {
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: `${systemPrompt}\n\nUser: ${userText}\nAvatar:` }] }],
+                    contents: [{ parts: [{ text: `${prompt}\n\nUser: ${text}\nAvatar:` }] }],
                     generationConfig: { temperature: 0.9, maxOutputTokens: 100 }
                 }),
             });
-            if (!res.ok) {
-                const errBody = await res.text();
-                lastError = `${res.status}: ${errBody.slice(0, 200)}`;
-                if (res.status === 400 || res.status === 401 || res.status === 403) {
-                    throw new Error(lastError);
-                }
+            if (!r.ok) {
+                lastErr = `${r.status}: ${(await r.text()).slice(0, 150)}`;
+                if (r.status === 400 || r.status === 401 || r.status === 403) throw new Error(lastErr);
                 continue;
             }
-            const data = await res.json();
+            const data = await r.json();
             const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
             if (reply) return { ok: true, reply };
-            lastError = 'Empty response';
         } catch (e) {
-            lastError = e.message;
-            if (e.message.includes('400') || e.message.includes('401') || e.message.includes('403')) break;
+            lastErr = e.message;
+            if (e.message.includes('40')) break;
         }
     }
-    return { ok: false, error: lastError || 'Unknown error' };
+    return { ok: false, error: lastErr };
 }
 
-async function getAIResponse(userText) {
+async function getAIResponse(text) {
     if (els.aiMode.value === 'demo') {
         return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
     }
-    const apiKey = els.apiKey.value.trim();
-    if (!apiKey) {
-        return 'Eh, set Gemini API Key dulu ya, atau pilih Mode Demo!';
-    }
-    const systemPrompt = els.personality.value || `Aku ${els.avatarName.value}, AI yang ramah.`;
-    const result = await callGeminiAPI(userText, systemPrompt, apiKey);
+    const key = els.apiKey.value.trim();
+    if (!key) return 'Set Gemini API Key dulu, atau pilih Mode Demo!';
+    const prompt = els.personality.value || `Aku ${els.avatarName.value}, AI ramah.`;
+    const result = await callGemini(text, prompt, key);
     if (result.ok) return result.reply;
-
     logMessage('ai', `[ERROR Gemini] ${result.error}`);
-    const err = (result.error || '').toLowerCase();
-    if (err.includes('api_key') || err.includes('401') || err.includes('403')) {
-        return 'API Key salah/belum aktif. Cek lagi di aistudio.google.com!';
-    }
-    if (err.includes('429') || err.includes('quota')) {
-        return 'Quota AI habis, tunggu sebentar ya!';
-    }
     return DEMO_RESPONSES[Math.floor(Math.random() * DEMO_RESPONSES.length)];
 }
 
-// ----------- Reactions -----------
+// ============================================
+// REACTIONS & TRIGGERS
+// ============================================
 function spawnReaction(emoji, count = 1) {
     for (let i = 0; i < count; i++) {
         setTimeout(() => {
@@ -451,7 +608,6 @@ function spawnReaction(emoji, count = 1) {
     }
 }
 
-// ----------- Send message -----------
 async function handleSendMessage(text) {
     if (!text.trim() || state.speaking) return;
     logMessage('user', text);
@@ -461,46 +617,22 @@ async function handleSendMessage(text) {
     await speak(reply);
 }
 
-// ----------- Quick Triggers -----------
-const TRIGGER_RESPONSES = {
-    like: {
-        emoji: '❤️', count: 5,
-        say: () => {
-            const phrases = ['Makasih like-nya!', 'Yeay love love!', 'Aku juga sayang kalian!', 'Makasih banyak!'];
-            return phrases[Math.floor(Math.random() * phrases.length)];
-        },
-        animate: () => els.avatar.classList.add('happy'),
-    },
-    rose: {
-        emoji: '🌹', count: 8,
-        say: () => 'Wah cantiknyaa, makasih banyak ya rose-nya!',
-        animate: () => els.avatar.classList.add('happy'),
-    },
-    gift: {
-        emoji: '🎁', count: 12,
-        say: () => 'WAAAH GIFT-NYA GEDE BANGET! MAKASIH SAYANGGG!',
-        animate: () => {
-            els.avatar.classList.add('happy');
-            spawnReaction('✨', 10);
-        },
-    },
-    follow: {
-        emoji: '➕', count: 3,
-        say: () => 'Makasih udah follow! Selamat datang di keluarga kita!',
-        animate: () => els.avatar.classList.add('happy'),
-    },
+const TRIGGERS = {
+    like: { emoji: '❤️', count: 5, says: ['Makasih like-nya!', 'Yeay love love!', 'Aku juga sayang kalian!'] },
+    rose: { emoji: '🌹', count: 8, says: ['Wah cantiknya, makasih ya rose-nya!'] },
+    gift: { emoji: '🎁', count: 12, says: ['WAAAH GIFT-NYA GEDE BANGET! MAKASIH!'] },
+    follow: { emoji: '➕', count: 3, says: ['Makasih udah follow! Selamat datang!'] },
 };
 
 async function handleTrigger(action) {
-    const trigger = TRIGGER_RESPONSES[action];
-    if (!trigger || state.speaking) return;
-    spawnReaction(trigger.emoji, trigger.count);
-    trigger.animate();
-    setTimeout(() => els.avatar.classList.remove('happy'), 1500);
-    await speak(trigger.say());
+    const t = TRIGGERS[action];
+    if (!t || state.speaking) return;
+    spawnReaction(t.emoji, t.count);
+    triggerExpression('happy');
+    if (action === 'gift') spawnReaction('✨', 10);
+    await speak(t.says[Math.floor(Math.random() * t.says.length)]);
 }
 
-// ----------- Sparkles -----------
 function initSparkles() {
     for (let i = 0; i < 40; i++) {
         const s = document.createElement('span');
@@ -512,92 +644,60 @@ function initSparkles() {
     }
 }
 
-// ----------- Idle behavior -----------
-function startIdleBehavior() {
-    const eyelids = document.querySelectorAll('.eyelid');
-
-    setInterval(() => {
-        if (state.speaking) return;
-        eyelids.forEach(lid => lid.setAttribute('ry', '32'));
-        setTimeout(() => {
-            eyelids.forEach(lid => lid.setAttribute('ry', '0'));
-        }, 130);
-    }, 3000 + Math.random() * 3000);
-
-    setInterval(() => {
-        if (state.speaking) return;
-        const dirs = ['look-left', 'look-right', 'look-up', ''];
-        const dir = dirs[Math.floor(Math.random() * dirs.length)];
-        els.avatar.classList.remove('look-left', 'look-right', 'look-up');
-        if (dir) els.avatar.classList.add(dir);
-        setTimeout(() => {
-            els.avatar.classList.remove('look-left', 'look-right', 'look-up');
-        }, 1500);
-    }, 5000);
-}
-
-// ----------- Tap interaction -----------
-els.avatar.style.pointerEvents = 'auto';
-els.avatar.style.cursor = 'pointer';
-els.avatar.addEventListener('click', () => {
-    if (state.speaking) return;
-    spawnReaction('💖', 3);
-    els.avatar.classList.add('happy');
-    setTimeout(() => els.avatar.classList.remove('happy'), 800);
-});
-
-// ----------- Event Listeners -----------
+// ============================================
+// EVENT LISTENERS
+// ============================================
 els.sendBtn.addEventListener('click', () => {
-    const text = els.userMsg.value.trim();
-    if (text) {
-        els.userMsg.value = '';
-        handleSendMessage(text);
-    }
+    const t = els.userMsg.value.trim();
+    if (t) { els.userMsg.value = ''; handleSendMessage(t); }
 });
-
-els.userMsg.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') els.sendBtn.click();
-});
+els.userMsg.addEventListener('keypress', (e) => { if (e.key === 'Enter') els.sendBtn.click(); });
 
 document.querySelectorAll('.trigger-btn').forEach(btn => {
     btn.addEventListener('click', () => handleTrigger(btn.dataset.action));
 });
 
-els.aiMode.addEventListener('change', () => {
+els.modelSelect.addEventListener('change', () => {
     updateUIVisibility();
     saveSettings();
+    if (els.modelSelect.value !== 'custom') {
+        loadModel(els.modelSelect.value);
+    }
 });
 
-els.ttsMode.addEventListener('change', () => {
-    updateUIVisibility();
-    saveSettings();
+els.loadModelBtn.addEventListener('click', () => {
+    const url = els.customModelUrl.value.trim();
+    if (url) {
+        saveSettings();
+        loadModel(url);
+    }
 });
 
-els.elevenVoice.addEventListener('change', () => {
-    updateUIVisibility();
-    saveSettings();
-});
+els.aiMode.addEventListener('change', () => { updateUIVisibility(); saveSettings(); });
+els.ttsMode.addEventListener('change', () => { updateUIVisibility(); saveSettings(); });
+els.elevenVoice.addEventListener('change', () => { updateUIVisibility(); saveSettings(); });
 
 [els.apiKey, els.elevenApiKey, els.elevenCustomId, els.elevenModel,
- els.avatarName, els.personality, els.voiceSelect].forEach(el => {
+ els.avatarName, els.personality, els.voiceSelect, els.customModelUrl].forEach(el => {
     el.addEventListener('change', saveSettings);
 });
 
-els.pitch.addEventListener('input', () => {
-    els.pitchVal.textContent = els.pitch.value;
-    saveSettings();
-});
-
-els.rate.addEventListener('input', () => {
-    els.rateVal.textContent = els.rate.value;
+els.pitch.addEventListener('input', () => { els.pitchVal.textContent = els.pitch.value; saveSettings(); });
+els.rate.addEventListener('input', () => { els.rateVal.textContent = els.rate.value; saveSettings(); });
+els.modelSize.addEventListener('input', () => {
+    els.sizeVal.textContent = els.modelSize.value;
+    if (state.model) positionModel(state.model);
     saveSettings();
 });
 
 els.obsBtn.addEventListener('click', () => {
     document.body.classList.toggle('obs-mode');
     els.obsBtn.textContent = document.body.classList.contains('obs-mode')
-        ? '✕ Keluar Mode OBS'
-        : '📺 Mode OBS (Transparan)';
+        ? '✕ Keluar Mode OBS' : '📺 Mode OBS (Transparan)';
+    if (state.pixiApp) {
+        state.pixiApp.renderer.resize(els.avatarContainer.clientWidth, els.avatarContainer.clientHeight);
+        if (state.model) positionModel(state.model);
+    }
 });
 
 els.panelHeader.addEventListener('click', (e) => {
@@ -612,13 +712,25 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'o' || e.key === 'O') els.obsBtn.click();
 });
 
-// ----------- Init -----------
+// ============================================
+// INIT
+// ============================================
 loadSettings();
 initSparkles();
-startIdleBehavior();
-setMouth('closed');
 
-// Welcome
-setTimeout(() => {
-    speak(`Halo! Aku ${els.avatarName.value || 'Mira'}, siap nemenin live kamu hari ini!`);
-}, 800);
+// Load default model on startup
+window.addEventListener('load', async () => {
+    const url = els.modelSelect.value !== 'custom'
+        ? els.modelSelect.value
+        : els.customModelUrl.value;
+    if (url) {
+        await loadModel(url);
+    } else {
+        hideLoading();
+    }
+
+    // Welcome speech (delayed to avoid auto-play issues)
+    setTimeout(() => {
+        speak(`Halo! Aku ${els.avatarName.value || 'Mira'}, VTuber AI yang siap nemenin live kamu hari ini!`);
+    }, 1500);
+});

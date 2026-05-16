@@ -1,5 +1,5 @@
 /* ============================================
-   Avatar AI - Genshin Impact Style
+   VTuber Avatar AI - Live2D Style
    ============================================ */
 
 * {
@@ -28,13 +28,13 @@ body {
     color: var(--text);
 }
 
-/* OBS Mode */
 body.obs-mode {
-    background: transparent;
+    background: transparent !important;
 }
 body.obs-mode .settings-panel,
 body.obs-mode .status,
-body.obs-mode .bg-glow {
+body.obs-mode .bg-glow,
+body.obs-mode .sparkles {
     display: none !important;
 }
 
@@ -65,29 +65,19 @@ body.obs-mode .bg-glow {
     cursor: pointer;
 }
 
-.panel-header h1 {
-    font-size: 18px;
-    font-weight: 700;
-}
+.panel-header h1 { font-size: 18px; font-weight: 700; }
 
 .toggle-btn {
     background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    width: 28px;
-    height: 28px;
+    border: none; color: white;
+    width: 28px; height: 28px;
     border-radius: 50%;
-    cursor: pointer;
-    font-size: 12px;
+    cursor: pointer; font-size: 12px;
     transition: transform 0.3s;
 }
 
-.settings-panel.collapsed .panel-body {
-    display: none;
-}
-.settings-panel.collapsed .toggle-btn {
-    transform: rotate(180deg);
-}
+.settings-panel.collapsed .panel-body { display: none; }
+.settings-panel.collapsed .toggle-btn { transform: rotate(180deg); }
 
 .panel-body {
     padding: 16px 18px;
@@ -95,17 +85,10 @@ body.obs-mode .bg-glow {
     flex: 1;
 }
 
-.panel-body::-webkit-scrollbar {
-    width: 6px;
-}
-.panel-body::-webkit-scrollbar-thumb {
-    background: var(--accent);
-    border-radius: 3px;
-}
+.panel-body::-webkit-scrollbar { width: 6px; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
 
-.form-group {
-    margin-bottom: 14px;
-}
+.form-group { margin-bottom: 14px; }
 
 .form-group label {
     display: block;
@@ -146,10 +129,7 @@ body.obs-mode .bg-glow {
     border-color: var(--gold);
 }
 
-.form-group textarea {
-    resize: vertical;
-    min-height: 50px;
-}
+.form-group textarea { resize: vertical; min-height: 50px; }
 
 .form-group.inline {
     display: flex;
@@ -168,17 +148,12 @@ body.obs-mode .bg-glow {
     accent-color: var(--accent);
 }
 
-.chat-input {
-    display: flex;
-    gap: 8px;
-}
-
-.chat-input input {
-    flex: 1;
-}
+.chat-input { display: flex; gap: 8px; }
+.chat-input input { flex: 1; }
 
 .chat-input button,
-.obs-btn {
+.obs-btn,
+.reload-btn {
     background: linear-gradient(90deg, var(--accent-dark), var(--accent));
     color: white;
     border: none;
@@ -191,18 +166,25 @@ body.obs-mode .bg-glow {
 }
 
 .chat-input button:hover,
-.obs-btn:hover {
+.obs-btn:hover,
+.reload-btn:hover {
     box-shadow: 0 4px 16px rgba(167, 139, 250, 0.6);
 }
 
 .chat-input button:active,
-.obs-btn:active {
+.obs-btn:active,
+.reload-btn:active {
     transform: scale(0.96);
 }
 
-.obs-btn {
+.obs-btn, .reload-btn {
     width: 100%;
     padding: 12px;
+}
+
+.reload-btn {
+    margin-top: 6px;
+    padding: 8px;
 }
 
 .trigger-grid {
@@ -238,31 +220,67 @@ body.obs-mode .bg-glow {
     line-height: 1.5;
 }
 
-.chat-log::-webkit-scrollbar {
-    width: 4px;
-}
-.chat-log::-webkit-scrollbar-thumb {
-    background: var(--accent);
-    border-radius: 2px;
-}
+.chat-log::-webkit-scrollbar { width: 4px; }
+.chat-log::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
 
-.chat-log .msg-user {
-    color: #ffd6e8;
-    margin-bottom: 4px;
-}
-.chat-log .msg-ai {
+.chat-log .msg-user { color: #ffd6e8; margin-bottom: 4px; word-break: break-word; }
+.chat-log .msg-ai { color: #c4b5fd; margin-bottom: 8px; word-break: break-word; }
+
+.hint {
+    font-size: 11px;
     color: #c4b5fd;
-    margin-bottom: 8px;
+    background: rgba(167, 139, 250, 0.1);
+    padding: 8px 10px;
+    border-radius: 6px;
+    line-height: 1.5;
+    border-left: 3px solid var(--gold);
 }
 
 /* =============== AVATAR STAGE =============== */
 .avatar-stage {
     position: fixed;
     inset: 0;
+    pointer-events: none;
+}
+
+.avatar-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+}
+
+#live2dCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.loading-overlay {
+    position: absolute;
+    inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    pointer-events: none;
+    background: rgba(20, 12, 40, 0.7);
+    backdrop-filter: blur(8px);
+    color: var(--text);
+    font-size: 14px;
+    gap: 16px;
+    z-index: 50;
+}
+
+.spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(167, 139, 250, 0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 .status {
@@ -276,22 +294,27 @@ body.obs-mode .bg-glow {
     font-size: 11px;
     backdrop-filter: blur(4px);
     border: 1px solid var(--panel-border);
+    z-index: 30;
 }
 
-/* Background magical glow circle (Genshin vibe) */
+/* Background magical glow */
 .bg-glow {
     position: absolute;
-    width: 600px;
-    height: 600px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    height: 700px;
     background: radial-gradient(circle, rgba(167, 139, 250, 0.3) 0%, rgba(167, 139, 250, 0) 70%);
     border-radius: 50%;
     pointer-events: none;
     animation: glowPulse 4s ease-in-out infinite;
+    z-index: 1;
 }
 
 @keyframes glowPulse {
-    0%, 100% { transform: scale(1); opacity: 0.6; }
-    50% { transform: scale(1.1); opacity: 0.9; }
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
 }
 
 /* Sparkles */
@@ -300,6 +323,7 @@ body.obs-mode .bg-glow {
     inset: 0;
     pointer-events: none;
     overflow: hidden;
+    z-index: 2;
 }
 
 .sparkles span {
@@ -336,7 +360,8 @@ body.obs-mode .bg-glow {
     border: 2px solid var(--gold);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     text-align: center;
-    z-index: 10;
+    z-index: 40;
+    pointer-events: none;
 }
 
 .speech-bubble.show {
@@ -349,114 +374,10 @@ body.obs-mode .bg-glow {
     bottom: -12px;
     left: 50%;
     transform: translateX(-50%);
-    width: 0;
-    height: 0;
+    width: 0; height: 0;
     border-left: 14px solid transparent;
     border-right: 14px solid transparent;
     border-top: 14px solid #f3e8ff;
-}
-
-/* =============== AVATAR (SVG Genshin Style) =============== */
-.avatar {
-    position: relative;
-    width: 500px;
-    height: 700px;
-    max-width: 90vw;
-    max-height: 90vh;
-    animation: idle 3s ease-in-out infinite;
-    filter: drop-shadow(0 15px 30px rgba(124, 58, 237, 0.5));
-}
-
-.avatar-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-@keyframes idle {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
-}
-
-.avatar.talking {
-    animation: talkingBob 0.4s ease-in-out infinite;
-}
-
-@keyframes talkingBob {
-    0%, 100% { transform: translateY(-3px); }
-    50% { transform: translateY(-8px); }
-}
-
-.avatar.happy {
-    animation: bounce 0.5s ease-in-out 3;
-}
-
-@keyframes bounce {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-30px) scale(1.05); }
-}
-
-/* Hair sway */
-.hair-back-group, .hair-front {
-    transform-origin: 250px 220px;
-    animation: hairSway 5s ease-in-out infinite;
-}
-
-@keyframes hairSway {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(0.8deg); }
-}
-
-/* Vision gem pulse */
-.vision-gem {
-    transform-origin: 250px 510px;
-    animation: gemPulse 2s ease-in-out infinite;
-}
-
-@keyframes gemPulse {
-    0%, 100% { opacity: 0.9; }
-    50% { opacity: 1; filter: drop-shadow(0 0 8px var(--gold)); }
-}
-
-/* Forehead gem twinkle */
-.forehead-gem {
-    transform-origin: 250px 235px;
-    animation: gemTwinkle 3s ease-in-out infinite;
-}
-
-@keyframes gemTwinkle {
-    0%, 100% { opacity: 0.9; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.1); }
-}
-
-/* Eyelid (animated via JS) */
-.eyelid {
-    transition: ry 0.1s ease-out;
-}
-
-/* Eye look direction */
-.eyeball, .pupil {
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.avatar.look-left .eyeball,
-.avatar.look-left .pupil {
-    transform: translateX(-6px);
-}
-
-.avatar.look-right .eyeball,
-.avatar.look-right .pupil {
-    transform: translateX(6px);
-}
-
-.avatar.look-up .eyeball,
-.avatar.look-up .pupil {
-    transform: translateY(-4px);
-}
-
-/* Mouth animations are handled via JS setting `d` attribute */
-.mouth-shape {
-    transition: d 0.08s ease-out;
 }
 
 /* =============== REACTIONS =============== */
@@ -464,6 +385,7 @@ body.obs-mode .bg-glow {
     position: absolute;
     inset: 0;
     pointer-events: none;
+    z-index: 35;
 }
 
 .reaction {
@@ -493,10 +415,6 @@ body.obs-mode .bg-glow {
     .settings-panel {
         width: calc(100vw - 32px);
         max-height: 60vh;
-    }
-    .avatar {
-        width: 90vw;
-        height: auto;
     }
     .speech-bubble {
         font-size: 14px;
